@@ -1,160 +1,721 @@
 <script setup lang="ts">
 import { ref } from "vue";
 import { invoke } from "@tauri-apps/api/core";
+import { save } from "@tauri-apps/plugin-dialog";
+import { writeTextFile } from "@tauri-apps/plugin-fs";
 
-const greetMsg = ref("");
-const name = ref("");
+// 类型定义
+interface LineResult {
+  line_number: number;
+  original_text: string;
+  extracted_content?: string;
+  status: 'Normal' | 'Error' | 'Duplicate' | 'Selected';
+}
 
-async function greet() {
-  // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
-  greetMsg.value = await invoke("greet", { name: name.value });
+interface ProcessResult {
+  input_lines: LineResult[];
+  output_lines: string[];
+  duplicate_groups: Record<string, number[]>;
+}
+
+// 响应式状态
+const inputText = ref("");
+const processResult = ref<ProcessResult | null>(null);
+const isProcessing = ref(false);
+
+// 处理文本的主函数
+async function processText() {
+  if (!inputText.value.trim()) {
+    return;
+  }
+  
+  isProcessing.value = true;
+  try {
+    const result = await invoke<ProcessResult>("process_text", { 
+      input: inputText.value 
+    });
+    processResult.value = result;
+  } catch (error) {
+    console.error("处理文本时出错:", error);
+  } finally {
+    isProcessing.value = false;
+  }
+}
+
+// 切换行选中状态
+async function toggleLineSelection(extractedContent: string) {
+  if (!processResult.value) return;
+  
+  try {
+    const result = await invoke<ProcessResult>("toggle_line_selection", {
+      processResult: processResult.value,
+      extractedContent
+    });
+    processResult.value = result;
+  } catch (error) {
+    console.error("切换行选中状态时出错:", error);
+  }
+}
+
+// 重置所有状态
+function resetAll() {
+  inputText.value = "";
+  processResult.value = null;
+}
+
+// 清除选中状态
+function clearSelection() {
+  if (!processResult.value) return;
+  
+  // 将所有 Selected 状态恢复为 Duplicate
+  processResult.value.input_lines.forEach(line => {
+    if (line.status === 'Selected') {
+      line.status = 'Duplicate';
+    }
+  });
+}
+
+// 导出结果
+async function exportResult() {
+  if (!processResult.value?.output_lines.length) {
+    return;
+  }
+  
+  try {
+    const content = processResult.value.output_lines.join('\n');
+    
+    // 使用 Tauri 的文件保存对话框
+    const filePath = await save({
+      filters: [{
+        name: '文本文件',
+        extensions: ['txt']
+      }],
+      defaultPath: 'processed_result.txt'
+    });
+    
+    if (filePath) {
+      // 写入文件
+      await writeTextFile(filePath, content);
+      
+      // 可以添加成功提示
+      console.log('文件导出成功:', filePath);
+    }
+  } catch (error) {
+    console.error('导出文件时出错:', error);
+  }
+}
+
+// 获取行的CSS类
+function getLineClass(line: LineResult): string {
+  switch (line.status) {
+    case 'Error': return 'line-error';
+    case 'Duplicate': return 'line-duplicate';
+    case 'Selected': return 'line-selected';
+    default: return 'line-normal';
+  }
+}
+
+// 处理行点击事件
+function handleLineClick(line: LineResult) {
+  if (line.status === 'Duplicate' || line.status === 'Selected') {
+    if (line.extracted_content) {
+      toggleLineSelection(line.extracted_content);
+    }
+  }
+}
+
+// 获取行的提示信息
+function getLineTooltip(line: LineResult): string {
+  switch (line.status) {
+    case 'Error':
+      return '无法提取有效内容';
+    case 'Duplicate':
+      return `提取内容: ${line.extracted_content || '无'} (点击查看重复项)`;
+    case 'Selected':
+      return `提取内容: ${line.extracted_content || '无'} (点击取消选中)`;
+    default:
+      return `提取内容: ${line.extracted_content || '无'}`;
+  }
+}
+
+// 统计函数
+function getSuccessCount(): number {
+  if (!processResult.value) return 0;
+  return processResult.value.input_lines.filter(line => 
+    line.status !== 'Error'
+  ).length;
+}
+
+function getErrorCount(): number {
+  if (!processResult.value) return 0;
+  return processResult.value.input_lines.filter(line => 
+    line.status === 'Error'
+  ).length;
+}
+
+function getDuplicateCount(): number {
+  if (!processResult.value) return 0;
+  return Object.keys(processResult.value.duplicate_groups).length;
+}
+
+function hasSelectedLines(): boolean {
+  if (!processResult.value) return false;
+  return processResult.value.input_lines.some(line => line.status === 'Selected');
 }
 </script>
 
 <template>
-  <main class="container">
-    <h1>Welcome to Tauri + Vue</h1>
-
-    <div class="row">
-      <a href="https://vite.dev" target="_blank">
-        <img src="/vite.svg" class="logo vite" alt="Vite logo" />
-      </a>
-      <a href="https://tauri.app" target="_blank">
-        <img src="/tauri.svg" class="logo tauri" alt="Tauri logo" />
-      </a>
-      <a href="https://vuejs.org/" target="_blank">
-        <img src="./assets/vue.svg" class="logo vue" alt="Vue logo" />
-      </a>
+  <div class="app-container">
+    <div class="header">
+      <h1>文本提取去重工具</h1>
+      <p class="subtitle">支持提取邮箱、URL、手机号、身份证号等信息并自动去重</p>
     </div>
-    <p>Click on the Tauri, Vite, and Vue logos to learn more.</p>
+    
+    <div class="main-layout">
+      <!-- 左侧输入面板 -->
+      <div class="input-panel">
+        <div class="panel-header">
+          <h3>输入文本</h3>
+          <div class="status-info">
+            <span v-if="processResult" class="line-count">
+              共 {{ processResult.input_lines.length }} 行
+            </span>
+          </div>
+        </div>
+        <div class="text-area-container">
+          <div class="line-numbers" v-if="processResult">
+            <div 
+              v-for="line in processResult.input_lines" 
+              :key="line.line_number"
+              class="line-number"
+            >
+              {{ line.line_number }}
+            </div>
+          </div>
+          <textarea
+            v-model="inputText"
+            class="input-textarea"
+            :class="{ 'input-hidden': processResult }"
+            placeholder="请在此输入要处理的文本，每行一条记录...
 
-    <form class="row" @submit.prevent="greet">
-      <input id="greet-input" v-model="name" placeholder="Enter a name..." />
-      <button type="submit">Greet</button>
-    </form>
-    <p>{{ greetMsg }}</p>
-  </main>
+支持提取：
+• 邮箱地址：example@domain.com
+• 网址：http://example.com
+• 手机号：13812345678
+• 身份证号：123456789012345678
+• 其他：至少6位数字字母组合"
+            :readonly="isProcessing"
+          ></textarea>
+          <div class="text-overlay" v-if="processResult">
+            <div 
+              v-for="line in processResult.input_lines" 
+              :key="line.line_number"
+              :class="['text-line', getLineClass(line)]"
+              @click="handleLineClick(line)"
+              :title="getLineTooltip(line)"
+            >
+              {{ line.original_text }}
+            </div>
+          </div>
+        </div>
+        
+        <!-- 状态说明 -->
+        <div class="legend" v-if="processResult">
+          <div class="legend-item">
+            <span class="legend-color legend-normal"></span>
+            <span>正常提取</span>
+          </div>
+          <div class="legend-item">
+            <span class="legend-color legend-error"></span>
+            <span>提取失败</span>
+          </div>
+          <div class="legend-item">
+            <span class="legend-color legend-duplicate"></span>
+            <span>存在重复</span>
+          </div>
+          <div class="legend-item">
+            <span class="legend-color legend-selected"></span>
+            <span>当前选中</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 中间控制面板 -->
+      <div class="control-panel">
+        <button 
+          @click="processText" 
+          :disabled="isProcessing || !inputText.trim()"
+          class="control-btn convert-btn"
+        >
+          <span v-if="isProcessing">处理中...</span>
+          <span v-else>转换</span>
+        </button>
+        
+        <button 
+          @click="exportResult"
+          :disabled="!processResult?.output_lines.length"
+          class="control-btn export-btn"
+        >
+          导出
+        </button>
+        
+        <button 
+          @click="clearSelection"
+          :disabled="!processResult || !hasSelectedLines()"
+          class="control-btn clear-btn"
+        >
+          清除选中
+        </button>
+        
+        <button 
+          @click="resetAll"
+          class="control-btn reset-btn"
+        >
+          重置
+        </button>
+        
+        <!-- 统计信息 -->
+        <div class="stats" v-if="processResult">
+          <div class="stat-item">
+            <span class="stat-label">提取成功：</span>
+            <span class="stat-value">{{ getSuccessCount() }}</span>
+          </div>
+          <div class="stat-item">
+            <span class="stat-label">提取失败：</span>
+            <span class="stat-value">{{ getErrorCount() }}</span>
+          </div>
+          <div class="stat-item">
+            <span class="stat-label">重复项：</span>
+            <span class="stat-value">{{ getDuplicateCount() }}</span>
+          </div>
+          <div class="stat-item">
+            <span class="stat-label">最终结果：</span>
+            <span class="stat-value">{{ processResult.output_lines.length }}</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 右侧输出面板 -->
+      <div class="output-panel">
+        <div class="panel-header">
+          <h3>处理结果</h3>
+          <div class="result-info">
+            <span v-if="processResult?.output_lines.length" class="result-count">
+              共 {{ processResult.output_lines.length }} 条记录
+            </span>
+          </div>
+        </div>
+        <div class="output-container">
+          <div class="output-content">
+            <div v-if="!processResult" class="placeholder">
+              <div class="placeholder-icon">📝</div>
+              <div class="placeholder-text">点击转换按钮查看处理结果</div>
+            </div>
+            <div v-else-if="!processResult.output_lines.length" class="placeholder">
+              <div class="placeholder-icon">❌</div>
+              <div class="placeholder-text">没有提取到有效内容</div>
+            </div>
+            <div v-else>
+              <div 
+                v-for="(line, index) in processResult.output_lines" 
+                :key="index"
+                class="output-line"
+              >
+                <span class="output-line-number">{{ index + 1 }}</span>
+                <span class="output-text">{{ line }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
 </template>
 
 <style scoped>
-.logo.vite:hover {
-  filter: drop-shadow(0 0 2em #747bff);
-}
-
-.logo.vue:hover {
-  filter: drop-shadow(0 0 2em #249b73);
-}
-
-</style>
-<style>
-:root {
-  font-family: Inter, Avenir, Helvetica, Arial, sans-serif;
-  font-size: 16px;
-  line-height: 24px;
-  font-weight: 400;
-
-  color: #0f0f0f;
-  background-color: #f6f6f6;
-
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  -webkit-text-size-adjust: 100%;
-}
-
-.container {
-  margin: 0;
-  padding-top: 10vh;
+.app-container {
+  height: 100vh;
+  padding: 16px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   display: flex;
   flex-direction: column;
-  justify-content: center;
+}
+
+.header {
   text-align: center;
+  color: white;
+  margin-bottom: 20px;
 }
 
-.logo {
-  height: 6em;
-  padding: 1.5em;
-  will-change: filter;
-  transition: 0.75s;
+.header h1 {
+  margin: 0 0 8px 0;
+  font-size: 28px;
+  font-weight: 600;
 }
 
-.logo.tauri:hover {
-  filter: drop-shadow(0 0 2em #24c8db);
+.subtitle {
+  margin: 0;
+  opacity: 0.9;
+  font-size: 14px;
 }
 
-.row {
+.main-layout {
   display: flex;
-  justify-content: center;
+  flex: 1;
+  gap: 16px;
+  min-height: 0;
 }
 
-a {
-  font-weight: 500;
-  color: #646cff;
-  text-decoration: inherit;
+/* 左侧输入面板 */
+.input-panel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  background: white;
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
 }
 
-a:hover {
-  color: #535bf2;
+.panel-header {
+  display: flex;
+  justify-content: between;
+  align-items: center;
+  margin-bottom: 16px;
 }
 
-h1 {
-  text-align: center;
+.panel-header h3 {
+  margin: 0;
+  color: #333;
+  font-size: 18px;
+  font-weight: 600;
 }
 
-input,
-button {
+.status-info, .result-info {
+  font-size: 12px;
+  color: #666;
+}
+
+.line-count, .result-count {
+  background: #f0f0f0;
+  padding: 2px 8px;
+  border-radius: 12px;
+}
+
+.text-area-container {
+  position: relative;
+  flex: 1;
+  border: 2px solid #e1e5e9;
   border-radius: 8px;
-  border: 1px solid transparent;
-  padding: 0.6em 1.2em;
-  font-size: 1em;
+  overflow: hidden;
+  min-height: 300px;
+}
+
+.line-numbers {
+  position: absolute;
+  left: 0;
+  top: 12px;
+  width: 50px;
+  height: calc(100% - 24px);
+  background: #f8f9fa;
+  border-right: 1px solid #e1e5e9;
+  font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', monospace;
+  font-size: 12px;
+  line-height: 1.5;
+  z-index: 2;
+  overflow: hidden;
+}
+
+.line-number {
+  text-align: right;
+  padding: 0 8px;
+  color: #6c757d;
+  height: 1.5em;
   font-weight: 500;
-  font-family: inherit;
-  color: #0f0f0f;
-  background-color: #ffffff;
-  transition: border-color 0.25s;
-  box-shadow: 0 2px 2px rgba(0, 0, 0, 0.2);
 }
 
-button {
-  cursor: pointer;
-}
-
-button:hover {
-  border-color: #396cd8;
-}
-button:active {
-  border-color: #396cd8;
-  background-color: #e8e8e8;
-}
-
-input,
-button {
+.input-textarea {
+  width: 100%;
+  height: 100%;
+  border: none;
   outline: none;
+  resize: none;
+  padding: 12px;
+  padding-left: 60px;
+  font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', monospace;
+  font-size: 14px;
+  line-height: 1.5;
+  background: transparent;
+  color: #495057;
 }
 
-#greet-input {
-  margin-right: 5px;
+.input-textarea.input-hidden {
+  color: transparent;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    color: #f6f6f6;
-    background-color: #2f2f2f;
-  }
-
-  a:hover {
-    color: #24c8db;
-  }
-
-  input,
-  button {
-    color: #ffffff;
-    background-color: #0f0f0f98;
-  }
-  button:active {
-    background-color: #0f0f0f69;
-  }
+.input-textarea::placeholder {
+  color: #6c757d;
+  opacity: 0.8;
 }
 
+.text-overlay {
+  position: absolute;
+  top: 12px;
+  left: 60px;
+  right: 12px;
+  bottom: 12px;
+  pointer-events: none;
+  font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', monospace;
+  font-size: 14px;
+  line-height: 1.5;
+  padding: 0;
+  overflow: hidden;
+  color: #495057;
+}
+
+.text-line {
+  height: 1.5em;
+  pointer-events: auto;
+  cursor: pointer;
+  margin-bottom: 0;
+  border-radius: 3px;
+  transition: all 0.2s ease;
+}
+
+.line-normal {
+  background-color: transparent;
+}
+
+.line-error {
+  background-color: rgba(220, 53, 69, 0.15);
+  border-left: 3px solid #dc3545;
+  padding-left: 5px;
+}
+
+.line-duplicate {
+  background-color: rgba(0, 123, 255, 0.15);
+  border-left: 3px solid #007bff;
+  padding-left: 5px;
+}
+
+.line-selected {
+  background-color: rgba(255, 193, 7, 0.25);
+  border-left: 3px solid #ffc107;
+  padding-left: 5px;
+}
+
+.line-duplicate:hover, .line-selected:hover {
+  transform: translateX(2px);
+}
+
+/* 图例 */
+.legend {
+  display: flex;
+  gap: 16px;
+  margin-top: 12px;
+  padding: 12px;
+  background: #f8f9fa;
+  border-radius: 6px;
+  font-size: 12px;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.legend-color {
+  width: 12px;
+  height: 12px;
+  border-radius: 2px;
+  border: 1px solid #ddd;
+}
+
+.legend-normal { background: white; }
+.legend-error { background: rgba(220, 53, 69, 0.15); border-color: #dc3545; }
+.legend-duplicate { background: rgba(0, 123, 255, 0.15); border-color: #007bff; }
+.legend-selected { background: rgba(255, 193, 7, 0.25); border-color: #ffc107; }
+
+/* 中间控制面板 */
+.control-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  justify-content: flex-start;
+  min-width: 140px;
+  padding-top: 60px;
+}
+
+.control-btn {
+  padding: 14px 20px;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  transition: all 0.3s ease;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.convert-btn {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+}
+
+.convert-btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(102, 126, 234, 0.6);
+}
+
+.export-btn {
+  background: linear-gradient(135deg, #56ab2f 0%, #a8e6cf 100%);
+  color: white;
+  box-shadow: 0 4px 15px rgba(86, 171, 47, 0.4);
+}
+
+.export-btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(86, 171, 47, 0.6);
+}
+
+.clear-btn {
+  background: linear-gradient(135deg, #fd7e14 0%, #ffb347 100%);
+  color: white;
+  box-shadow: 0 4px 15px rgba(253, 126, 20, 0.4);
+}
+
+.clear-btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(253, 126, 20, 0.6);
+}
+
+.reset-btn {
+  background: linear-gradient(135deg, #6c757d 0%, #adb5bd 100%);
+  color: white;
+  box-shadow: 0 4px 15px rgba(108, 117, 125, 0.4);
+}
+
+.reset-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(108, 117, 125, 0.6);
+}
+
+.control-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none !important;
+  box-shadow: none !important;
+}
+
+.stats {
+  background: white;
+  padding: 16px;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  margin-top: 20px;
+}
+
+.stat-item {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  font-size: 12px;
+}
+
+.stat-label {
+  color: #6c757d;
+}
+
+.stat-value {
+  font-weight: 600;
+  color: #495057;
+}
+
+/* 右侧输出面板 */
+.output-panel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  background: white;
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
+}
+
+.output-container {
+  flex: 1;
+  border: 2px solid #e1e5e9;
+  border-radius: 8px;
+  overflow: auto;
+  min-height: 300px;
+}
+
+.output-content {
+  padding: 16px;
+  font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', monospace;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.placeholder {
+  color: #6c757d;
+  text-align: center;
+  padding: 60px 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.placeholder-icon {
+  font-size: 48px;
+  opacity: 0.5;
+}
+
+.placeholder-text {
+  font-size: 16px;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+}
+
+.output-line {
+  display: flex;
+  margin-bottom: 8px;
+  padding: 6px;
+  border-radius: 4px;
+  transition: background-color 0.2s ease;
+}
+
+.output-line:hover {
+  background-color: #f8f9fa;
+}
+
+.output-line-number {
+  color: #6c757d;
+  width: 50px;
+  text-align: right;
+  margin-right: 16px;
+  flex-shrink: 0;
+  font-weight: 500;
+}
+
+.output-text {
+  flex: 1;
+  color: #495057;
+  word-break: break-all;
+}
+</style>
+
+<style>
+body {
+  margin: 0;
+  padding: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+}
+
+#app {
+  height: 100vh;
+}
 </style>
