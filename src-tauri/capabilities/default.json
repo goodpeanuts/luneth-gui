@@ -1,12 +1,21 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Capability for the main window",
+  "description": "Capability for the main window (explicit fs write permission for common user paths)",
   "windows": ["main"],
   "permissions": [
-    "core:default",
-    "opener:default",
-    "dialog:default",
-    "fs:default"
+  "core:default",
+  "opener:default",
+  "dialog:allow-open",
+  "dialog:allow-save",
+    {
+      "identifier": "fs:allow-write-text-file",
+      "allow": [
+        { "path": "$HOME/**" },
+        { "path": "$APPDATA/**" },
+        { "path": "$DOWNLOAD/**" },
+        { "path": "$DESKTOP/**" }
+      ]
+    }
   ]
 }

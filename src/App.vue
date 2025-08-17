@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from "vue";
+import { ref, computed, nextTick } from "vue";
 import { invoke } from "@tauri-apps/api/core";
 import { save } from "@tauri-apps/plugin-dialog";
 import { writeTextFile } from "@tauri-apps/plugin-fs";
@@ -22,6 +22,35 @@ interface ProcessResult {
 const inputText = ref("");
 const processResult = ref<ProcessResult | null>(null);
 const isProcessing = ref(false);
+
+// DOM 引用
+const textareaRef = ref<HTMLTextAreaElement>();
+const lineNumbersRef = ref<HTMLDivElement>();
+const highlightOverlayRef = ref<HTMLDivElement>();
+
+// 计算属性：显示的行数
+const displayLines = computed(() => {
+  const lines = inputText.value.split('\n');
+  return lines.length > 0 ? lines : [''];
+});
+
+// 滚动同步
+function syncScroll() {
+  if (textareaRef.value && lineNumbersRef.value) {
+    lineNumbersRef.value.scrollTop = textareaRef.value.scrollTop;
+  }
+  if (textareaRef.value && highlightOverlayRef.value) {
+    highlightOverlayRef.value.scrollTop = textareaRef.value.scrollTop;
+  }
+}
+
+// 更新行号显示
+function updateLineNumbers() {
+  // 这个函数会触发 displayLines 的重新计算
+  nextTick(() => {
+    syncScroll();
+  });
+}
 
 // 处理文本的主函数
 async function processText() {
@@ -78,11 +107,14 @@ function clearSelection() {
 // 导出结果
 async function exportResult() {
   if (!processResult.value?.output_lines.length) {
+    alert('没有可导出的内容');
     return;
   }
   
   try {
     const content = processResult.value.output_lines.join('\n');
+    
+    console.log('准备保存内容:', content.substring(0, 100) + '...');
     
     // 使用 Tauri 的文件保存对话框
     const filePath = await save({
@@ -93,15 +125,20 @@ async function exportResult() {
       defaultPath: 'processed_result.txt'
     });
     
+    console.log('选择的文件路径:', filePath);
+    
     if (filePath) {
       // 写入文件
       await writeTextFile(filePath, content);
       
-      // 可以添加成功提示
-      console.log('文件导出成功:', filePath);
+      console.log('文件写入成功:', filePath);
+      alert(`文件导出成功: ${filePath}`);
+    } else {
+      console.log('用户取消了保存操作');
     }
   } catch (error) {
     console.error('导出文件时出错:', error);
+    alert(`导出文件失败: ${error}`);
   }
 }
 
@@ -183,19 +220,21 @@ function hasSelectedLines(): boolean {
           </div>
         </div>
         <div class="text-area-container">
-          <div class="line-numbers" v-if="processResult">
+          <div class="line-numbers" ref="lineNumbersRef">
             <div 
-              v-for="line in processResult.input_lines" 
-              :key="line.line_number"
+              v-for="(_, index) in displayLines" 
+              :key="index + 1"
               class="line-number"
             >
-              {{ line.line_number }}
+              {{ index + 1 }}
             </div>
           </div>
           <textarea
             v-model="inputText"
+            ref="textareaRef"
             class="input-textarea"
-            :class="{ 'input-hidden': processResult }"
+            @scroll="syncScroll"
+            @input="updateLineNumbers"
             placeholder="请在此输入要处理的文本，每行一条记录...
 
 支持提取：
@@ -206,15 +245,14 @@ function hasSelectedLines(): boolean {
 • 其他：至少6位数字字母组合"
             :readonly="isProcessing"
           ></textarea>
-          <div class="text-overlay" v-if="processResult">
+          <div class="highlight-overlay" v-if="processResult" ref="highlightOverlayRef">
             <div 
               v-for="line in processResult.input_lines" 
               :key="line.line_number"
-              :class="['text-line', getLineClass(line)]"
+              :class="['highlight-line', getLineClass(line)]"
               @click="handleLineClick(line)"
               :title="getLineTooltip(line)"
             >
-              {{ line.original_text }}
             </div>
           </div>
         </div>
@@ -414,9 +452,9 @@ function hasSelectedLines(): boolean {
 .line-numbers {
   position: absolute;
   left: 0;
-  top: 12px;
+  top: 0;
   width: 50px;
-  height: calc(100% - 24px);
+  height: 100%;
   background: #f8f9fa;
   border-right: 1px solid #e1e5e9;
   font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', monospace;
@@ -424,6 +462,7 @@ function hasSelectedLines(): boolean {
   line-height: 1.5;
   z-index: 2;
   overflow: hidden;
+  padding: 12px 0;
 }
 
 .line-number {
@@ -447,10 +486,7 @@ function hasSelectedLines(): boolean {
   line-height: 1.5;
   background: transparent;
   color: #495057;
-}
-
-.input-textarea.input-hidden {
-  color: transparent;
+  overflow: auto;
 }
 
 .input-textarea::placeholder {
@@ -458,50 +494,52 @@ function hasSelectedLines(): boolean {
   opacity: 0.8;
 }
 
-.text-overlay {
+.highlight-overlay {
   position: absolute;
-  top: 12px;
+  top: 0;
   left: 60px;
-  right: 12px;
-  bottom: 12px;
+  right: 0;
+  height: 100%;
   pointer-events: none;
   font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', monospace;
   font-size: 14px;
   line-height: 1.5;
-  padding: 0;
+  padding: 12px 12px 12px 0;
   overflow: hidden;
-  color: #495057;
+  z-index: 1;
 }
 
-.text-line {
+.highlight-line {
   height: 1.5em;
   pointer-events: auto;
   cursor: pointer;
   margin-bottom: 0;
   border-radius: 3px;
   transition: all 0.2s ease;
+  width: 100%;
 }
 
 .line-normal {
   background-color: transparent;
+  pointer-events: none;
 }
 
 .line-error {
   background-color: rgba(220, 53, 69, 0.15);
   border-left: 3px solid #dc3545;
-  padding-left: 5px;
+  margin-left: -3px;
 }
 
 .line-duplicate {
   background-color: rgba(0, 123, 255, 0.15);
   border-left: 3px solid #007bff;
-  padding-left: 5px;
+  margin-left: -3px;
 }
 
 .line-selected {
   background-color: rgba(255, 193, 7, 0.25);
   border-left: 3px solid #ffc107;
-  padding-left: 5px;
+  margin-left: -3px;
 }
 
 .line-duplicate:hover, .line-selected:hover {
@@ -654,10 +692,11 @@ function hasSelectedLines(): boolean {
 }
 
 .output-content {
-  padding: 16px;
+  padding: 12px;
   font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', monospace;
   font-size: 14px;
-  line-height: 1.6;
+  line-height: 1.5;
+  position: relative;
 }
 
 .placeholder {
@@ -682,10 +721,12 @@ function hasSelectedLines(): boolean {
 
 .output-line {
   display: flex;
-  margin-bottom: 8px;
-  padding: 6px;
+  margin-bottom: 0;
+  padding: 0;
   border-radius: 4px;
   transition: background-color 0.2s ease;
+  height: 1.5em;
+  align-items: center;
 }
 
 .output-line:hover {
@@ -699,6 +740,9 @@ function hasSelectedLines(): boolean {
   margin-right: 16px;
   flex-shrink: 0;
   font-weight: 500;
+  font-size: 12px;
+  background: #f8f9fa;
+  padding: 0 8px;
 }
 
 .output-text {
