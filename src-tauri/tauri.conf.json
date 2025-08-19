@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "文本提取去重工具",
+  "productName": "luneth",
   "version": "0.1.0",
-  "identifier": "com.lunirelust.cli",
+  "identifier": "com.luneth.cli",
   "build": {
     "beforeDevCommand": "yarn dev",
     "devUrl": "http://localhost:5142",
@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "文本提取去重工具",
+        "title": "luneth",
         "width": 1200,
         "height": 800,
         "minWidth": 900,
