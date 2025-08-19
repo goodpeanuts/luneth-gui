@@ -204,7 +204,7 @@ function hasSelectedLines(): boolean {
 <template>
   <div class="app-container">
     <div class="header">
-      <h1>文本提取去重工具</h1>
+      <h1>luneth</h1>
       <p class="subtitle">支持提取邮箱、URL、手机号、身份证号等信息并自动去重</p>
     </div>
     
