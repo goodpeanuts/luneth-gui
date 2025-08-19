@@ -65,27 +65,23 @@ impl ActiveModelBehavior for ActiveModel {
 
 impl Model {
     /// 创建新的任务记录
-    pub fn new_task(
-        task_type: TaskType,
-        status: TaskStatus,
-        target_ids: Vec<String>,
-    ) -> ActiveModel {
+    pub fn new_task(task_type: TaskType, status: TaskStatus, target_ids: &[String]) -> ActiveModel {
         let mut active_model = ActiveModel::new();
 
         active_model.task_type = Set(task_type.to_string());
         active_model.status = Set(status.to_string());
-        active_model.target_ids = Set(serde_json::to_value(&target_ids).unwrap_or_default());
+        active_model.target_ids = Set(serde_json::to_value(target_ids).unwrap_or_default());
         active_model.total_count = Set(target_ids.len() as i32);
 
         active_model
     }
 
     /// 更新任务状态
-    pub fn update_status(&self, status: TaskStatus, failed_ids: Vec<String>) -> ActiveModel {
+    pub fn update_status(&self, status: TaskStatus, failed_ids: &[String]) -> ActiveModel {
         let mut active_model: ActiveModel = self.clone().into();
 
         active_model.status = Set(status.to_string());
-        active_model.failed_ids = Set(serde_json::to_value(&failed_ids).unwrap_or_default());
+        active_model.failed_ids = Set(serde_json::to_value(failed_ids).unwrap_or_default());
         active_model.failed_count = Set(failed_ids.len() as i32);
 
         if matches!(

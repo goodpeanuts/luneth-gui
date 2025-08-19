@@ -2,5 +2,5 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 fn main() {
-    lunirelust_cli_lib::run();
+    luneth_gui_lib::run();
 }

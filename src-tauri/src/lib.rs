@@ -28,34 +28,10 @@ pub struct ProcessResult {
 // 文本处理核心逻辑
 fn extract_content_from_line(line: &str) -> Option<String> {
     // 尝试提取邮箱地址
-    let email_re = Regex::new(r"([a-zA-Z]+)-(\d+)").unwrap();
+    let email_re = Regex::new(r"([a-zA-Z]+)-(\d+)").expect("Invalid regex");
     if let Some(mat) = email_re.find(line) {
         return Some(mat.as_str().to_owned());
     }
-
-    // // 尝试提取URL
-    // let url_re = Regex::new(r"https?://[^\s]+").unwrap();
-    // if let Some(mat) = url_re.find(line) {
-    //     return Some(mat.as_str().to_string());
-    // }
-
-    // // 尝试提取手机号（中国）
-    // let phone_re = Regex::new(r"1[3-9]\d{9}").unwrap();
-    // if let Some(mat) = phone_re.find(line) {
-    //     return Some(mat.as_str().to_string());
-    // }
-
-    // // 尝试提取身份证号（简单格式）
-    // let id_re = Regex::new(r"\d{17}[\dXx]|\d{15}").unwrap();
-    // if let Some(mat) = id_re.find(line) {
-    //     return Some(mat.as_str().to_string());
-    // }
-
-    // // 如果都没有匹配，尝试提取数字和字母组合（至少6位）
-    // let general_re = Regex::new(r"[A-Za-z0-9]{6,}").unwrap();
-    // if let Some(mat) = general_re.find(line) {
-    //     return Some(mat.as_str().to_string());
-    // }
 
     None
 }
@@ -99,6 +75,7 @@ fn process_text_lines(input: &str) -> ProcessResult {
 
     // 第二步：标记重复项
     let mut duplicate_groups = HashMap::new();
+    #[expect(clippy::iter_over_hash_type)]
     for (extracted, line_numbers) in &extracted_map {
         if line_numbers.len() > 1 {
             // 有重复，标记这些行
@@ -126,26 +103,28 @@ fn process_text_lines(input: &str) -> ProcessResult {
 
 // Tauri 命令：处理文本
 #[tauri::command]
-fn process_text(input: String) -> Result<ProcessResult, String> {
-    Ok(process_text_lines(&input))
+fn process_text(input: &str) -> ProcessResult {
+    process_text_lines(input)
 }
 
 // Tauri 命令：更新行选中状态
 #[tauri::command]
 fn toggle_line_selection(
     mut process_result: ProcessResult,
-    extracted_content: String,
-) -> Result<ProcessResult, String> {
+    extracted_content: &str,
+) -> ProcessResult {
     // 查找所有具有相同提取内容的行
-    if let Some(line_numbers) = process_result.duplicate_groups.get(&extracted_content) {
+    if let Some(line_numbers) = process_result.duplicate_groups.get(extracted_content) {
         let line_numbers = line_numbers.clone();
 
         // 检查当前状态，如果已经是Selected则恢复为Duplicate，否则设为Selected
-        let first_line = process_result
+        let Some(first_line) = process_result
             .input_lines
             .iter()
             .find(|l| l.line_number == line_numbers[0])
-            .unwrap();
+        else {
+            return process_result;
+        };
 
         let new_status = match first_line.status {
             LineStatus::Selected => LineStatus::Duplicate,
@@ -164,7 +143,7 @@ fn toggle_line_selection(
         }
     }
 
-    Ok(process_result)
+    process_result
 }
 
 // Tauri 命令：导出结果到文件
@@ -180,6 +159,8 @@ fn greet(name: &str) -> String {
     format!("Hello, {name}! You've been greeted from Rust!")
 }
 
+#[expect(clippy::large_stack_frames)]
+#[expect(clippy::exit)]
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()

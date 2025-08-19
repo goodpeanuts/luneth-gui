@@ -41,7 +41,7 @@ pub struct DownLink {
 }
 
 /// 操作类型枚举
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum OperationType {
     Create,
     Update,
@@ -72,7 +72,7 @@ impl std::str::FromStr for OperationType {
 }
 
 /// 操作状态枚举
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum OperationStatus {
     Success,
     Failed,
@@ -100,7 +100,7 @@ impl std::str::FromStr for OperationStatus {
 }
 
 /// 任务类型枚举
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum TaskType {
     Crawl,
     Submit,
@@ -131,7 +131,7 @@ impl std::str::FromStr for TaskType {
 }
 
 /// 任务状态枚举
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum TaskStatus {
     Success,
     Aborted,

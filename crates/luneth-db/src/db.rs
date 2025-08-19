@@ -44,7 +44,7 @@ impl DbOperator {
             .await
             .map_err(|e| DbError::ConnectionFailed(e.to_string()))?;
 
-        let mut operator = Self { db };
+        let operator = Self { db };
 
         // 创建表
         operator.create_tables_if_not_exist().await?;
@@ -53,7 +53,7 @@ impl DbOperator {
     }
 
     /// 创建所有表（如果不存在）
-    async fn create_tables_if_not_exist(&mut self) -> Result<()> {
+    async fn create_tables_if_not_exist(&self) -> Result<()> {
         let schema = Schema::new(sea_orm::DatabaseBackend::Sqlite);
         let db_sqlite = DbBackend::Sqlite;
 
