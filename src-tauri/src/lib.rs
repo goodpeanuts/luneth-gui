@@ -1,6 +1,6 @@
+use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use regex::Regex;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LineResult {
@@ -30,33 +30,33 @@ fn extract_content_from_line(line: &str) -> Option<String> {
     // 尝试提取邮箱地址
     let email_re = Regex::new(r"([a-zA-Z]+)-(\d+)").unwrap();
     if let Some(mat) = email_re.find(line) {
-        return Some(mat.as_str().to_string());
+        return Some(mat.as_str().to_owned());
     }
-    
+
     // // 尝试提取URL
     // let url_re = Regex::new(r"https?://[^\s]+").unwrap();
     // if let Some(mat) = url_re.find(line) {
     //     return Some(mat.as_str().to_string());
     // }
-    
+
     // // 尝试提取手机号（中国）
     // let phone_re = Regex::new(r"1[3-9]\d{9}").unwrap();
     // if let Some(mat) = phone_re.find(line) {
     //     return Some(mat.as_str().to_string());
     // }
-    
+
     // // 尝试提取身份证号（简单格式）
     // let id_re = Regex::new(r"\d{17}[\dXx]|\d{15}").unwrap();
     // if let Some(mat) = id_re.find(line) {
     //     return Some(mat.as_str().to_string());
     // }
-    
+
     // // 如果都没有匹配，尝试提取数字和字母组合（至少6位）
     // let general_re = Regex::new(r"[A-Za-z0-9]{6,}").unwrap();
     // if let Some(mat) = general_re.find(line) {
     //     return Some(mat.as_str().to_string());
     // }
-    
+
     None
 }
 
@@ -69,21 +69,22 @@ fn process_text_lines(input: &str) -> ProcessResult {
     // 第一步：提取每行内容并标记错误行
     for (index, line) in lines.iter().enumerate() {
         let line_number = index + 1;
-        let original_text = line.to_string();
-        
+        let original_text = (*line).to_owned();
+
         if let Some(extracted) = extract_content_from_line(line) {
             // 成功提取
-            extracted_map.entry(extracted.clone())
-                .or_insert_with(Vec::new)
+            extracted_map
+                .entry(extracted.clone())
+                .or_default()
                 .push(line_number);
-            
+
             input_lines.push(LineResult {
                 line_number,
                 original_text,
                 extracted_content: Some(extracted.clone()),
                 status: LineStatus::Normal,
             });
-            
+
             valid_extractions.push(extracted);
         } else {
             // 提取失败，标记为错误
@@ -102,7 +103,9 @@ fn process_text_lines(input: &str) -> ProcessResult {
         if line_numbers.len() > 1 {
             // 有重复，标记这些行
             for &line_num in line_numbers {
-                if let Some(line_result) = input_lines.iter_mut().find(|l| l.line_number == line_num) {
+                if let Some(line_result) =
+                    input_lines.iter_mut().find(|l| l.line_number == line_num)
+                {
                     line_result.status = LineStatus::Duplicate;
                 }
             }
@@ -130,32 +133,37 @@ fn process_text(input: String) -> Result<ProcessResult, String> {
 // Tauri 命令：更新行选中状态
 #[tauri::command]
 fn toggle_line_selection(
-    mut process_result: ProcessResult, 
-    extracted_content: String
+    mut process_result: ProcessResult,
+    extracted_content: String,
 ) -> Result<ProcessResult, String> {
     // 查找所有具有相同提取内容的行
     if let Some(line_numbers) = process_result.duplicate_groups.get(&extracted_content) {
         let line_numbers = line_numbers.clone();
-        
+
         // 检查当前状态，如果已经是Selected则恢复为Duplicate，否则设为Selected
-        let first_line = process_result.input_lines.iter()
+        let first_line = process_result
+            .input_lines
+            .iter()
             .find(|l| l.line_number == line_numbers[0])
             .unwrap();
-        
+
         let new_status = match first_line.status {
             LineStatus::Selected => LineStatus::Duplicate,
             _ => LineStatus::Selected,
         };
-        
+
         // 更新所有相关行的状态
         for line_number in line_numbers {
-            if let Some(line_result) = process_result.input_lines.iter_mut()
-                .find(|l| l.line_number == line_number) {
+            if let Some(line_result) = process_result
+                .input_lines
+                .iter_mut()
+                .find(|l| l.line_number == line_number)
+            {
                 line_result.status = new_status.clone();
             }
         }
     }
-    
+
     Ok(process_result)
 }
 
@@ -163,13 +171,13 @@ fn toggle_line_selection(
 #[tauri::command]
 async fn export_to_file(_content: String) -> Result<String, String> {
     // 这里我们返回一个成功消息，实际的文件保存将在前端处理
-    Ok("准备导出".to_string())
+    Ok("准备导出".to_owned())
 }
 
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 #[tauri::command]
 fn greet(name: &str) -> String {
-    format!("Hello, {}! You've been greeted from Rust!", name)
+    format!("Hello, {name}! You've been greeted from Rust!")
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -178,7 +186,12 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_dialog::init())
-        .invoke_handler(tauri::generate_handler![greet, process_text, toggle_line_selection, export_to_file])
+        .invoke_handler(tauri::generate_handler![
+            greet,
+            process_text,
+            toggle_line_selection,
+            export_to_file
+        ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
