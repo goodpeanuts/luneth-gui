@@ -11,12 +11,7 @@
         <h3 class="section-title">Scraping Mode</h3>
         <div class="task-type-options">
           <label class="task-option" :class="{ active: taskType === 'auto' }">
-            <input
-              type="radio"
-              v-model="taskType"
-              value="auto"
-              :disabled="isProcessing"
-            />
+            <input type="radio" v-model="taskType" value="auto" :disabled="isProcessing" />
             <div class="option-content">
               <div class="option-icon">🤖</div>
               <div class="option-text">
@@ -27,12 +22,7 @@
           </label>
 
           <label class="task-option" :class="{ active: taskType === 'manual' }">
-            <input
-              type="radio"
-              v-model="taskType"
-              value="manual"
-              :disabled="isProcessing"
-            />
+            <input type="radio" v-model="taskType" value="manual" :disabled="isProcessing" />
             <div class="option-content">
               <div class="option-icon">✋</div>
               <div class="option-text">
@@ -51,23 +41,14 @@
         </h3>
 
         <div v-if="taskType === 'auto'" class="url-input">
-          <input
-            v-model="urlInput"
-            type="url"
-            class="input-field"
-            placeholder="https://example.com/page"
-            :disabled="isProcessing"
-          />
+          <input v-model="urlInput" type="url" class="input-field" placeholder="https://example.com/page"
+            :disabled="isProcessing" />
         </div>
 
         <div v-else class="codes-input">
-          <textarea
-            v-model="codesInput"
-            class="input-field textarea"
-            placeholder="Enter codes, one per line:&#10;CODE001&#10;CODE002&#10;CODE003"
-            rows="8"
-            :disabled="isProcessing"
-          ></textarea>
+          <textarea v-model="codesInput" class="input-field textarea"
+            placeholder="Enter codes, one per line:&#10;CODE001&#10;CODE002&#10;CODE003" rows="8"
+            :disabled="isProcessing"></textarea>
           <div class="codes-hint">
             Enter one code per line. Each line will be processed as a separate code.
           </div>
@@ -76,15 +57,10 @@
 
       <!-- Action Section -->
       <div v-if="taskType" class="action-section">
-        <button
-          class="launch-btn"
-          :class="{
-            'processing': isProcessing,
-            'disabled': !canLaunch
-          }"
-          :disabled="!canLaunch"
-          @click="handleLaunch"
-        >
+        <button class="launch-btn" :class="{
+          'processing': isProcessing,
+          'disabled': !canLaunch
+        }" :disabled="!canLaunch" @click="handleLaunch">
           <span v-if="isProcessing" class="processing-content">
             <div class="spinner"></div>
             Processing...
@@ -100,6 +76,9 @@
           {{ successMessage }}
         </div>
       </div>
+
+      <!-- Progress Tracker -->
+      <ProgressTracker ref="progressTracker" v-if="showProgress" />
     </div>
   </div>
 </template>
@@ -107,8 +86,9 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue';
 import { invoke } from '@tauri-apps/api/core';
-import { appState, navigateTo, checkTaskBaseUrl } from '@/store';
+import { navigateTo, checkTaskBaseUrl } from '@/store';
 import type { ScrapTaskType } from '@/types';
+import ProgressTracker from '@/components/ProgressTracker.vue';
 
 const taskType = ref<ScrapTaskType | ''>('');
 const urlInput = ref('');
@@ -116,6 +96,8 @@ const codesInput = ref('');
 const isProcessing = ref(false);
 const errorMessage = ref('');
 const successMessage = ref('');
+const showProgress = ref(false);
+const progressTracker = ref<InstanceType<typeof ProgressTracker>>();
 
 // 计算属性
 const canLaunch = computed(() => {
@@ -132,6 +114,7 @@ const canLaunch = computed(() => {
 watch(taskType, () => {
   errorMessage.value = '';
   successMessage.value = '';
+  showProgress.value = false;
 });
 
 // 监听输入变化，清空错误信息
@@ -156,11 +139,17 @@ async function handleLaunch() {
   isProcessing.value = true;
   errorMessage.value = '';
   successMessage.value = '';
+  showProgress.value = true;
+
+  // Reset progress tracker
+  if (progressTracker.value) {
+    progressTracker.value.resetProgress();
+  }
 
   try {
     if (taskType.value === 'auto') {
       await invoke('launch_auto_scrap_task', { url: urlInput.value.trim() });
-      successMessage.value = 'Auto scraping task completed successfully!';
+      successMessage.value = 'Auto scraping task completed!';
     } else {
       const codes = codesInput.value
         .split('\n')
@@ -168,7 +157,7 @@ async function handleLaunch() {
         .filter(line => line !== '');
 
       await invoke('launch_manual_scrap_task', { codes });
-      successMessage.value = `Manual scraping task completed successfully! Processed ${codes.length} codes.`;
+      successMessage.value = `Manual scraping task completed. Processed ${codes.length} codes.`;
     }
   } catch (error) {
     errorMessage.value = `Scraping task failed: ${error}`;
@@ -283,7 +272,8 @@ async function handleLaunch() {
   margin-bottom: 32px;
 }
 
-.url-input, .codes-input {
+.url-input,
+.codes-input {
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -379,8 +369,13 @@ async function handleLaunch() {
 }
 
 @keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
+  0% {
+    transform: rotate(0deg);
+  }
+
+  100% {
+    transform: rotate(360deg);
+  }
 }
 
 .error-message {

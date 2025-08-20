@@ -2782,6 +2782,7 @@ name = "luneth-db"
 version = "0.1.0"
 dependencies = [
  "chrono",
+ "log",
  "luneth",
  "sea-orm",
  "serde",
@@ -2811,6 +2812,7 @@ dependencies = [
  "tauri-plugin-opener",
  "thiserror 1.0.69",
  "tokio",
+ "url",
 ]
 
 [[package]]

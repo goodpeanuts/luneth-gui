@@ -11,7 +11,6 @@ pub struct Model {
     pub url: String,
     #[sea_orm(column_type = "Text")]
     pub html: String,
-    pub base_url: String,
     pub cover: String,
     pub title: String,
     pub release_date: String,

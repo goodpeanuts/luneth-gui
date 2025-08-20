@@ -33,6 +33,7 @@ impl DbOperator {
 
         // 构建数据库文件路径
         let db_path = app_local_data_dir.join("luneth.db");
+        log::debug!("Database file path: {}", db_path.display());
         let db_url = format!("sqlite://{}?mode=rwc", db_path.display());
 
         // 配置连接选项

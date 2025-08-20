@@ -18,7 +18,7 @@
               'disabled': isUrlSet && !hasChanged,
               'valid': isUrlSet && hasChanged
             }"
-            placeholder="https://example.com"
+            :placeholder="appState.taskBaseUrl || 'https://www.example.com'"
             @input="onUrlInput"
           />
           <div v-if="isUrlSet && !hasChanged" class="current-url">
@@ -38,6 +38,15 @@
           <span v-if="isSubmitting">Setting...</span>
           <span v-else-if="isUrlSet && !hasChanged">URL Already Set</span>
           <span v-else>Set Base URL</span>
+        </button>
+
+        <button
+          v-if="isUrlSet"
+          class="reset-btn"
+          :disabled="isSubmitting"
+          @click="handleReset"
+        >
+          Reset URL
         </button>
 
         <div v-if="errorMessage" class="error-message">
@@ -94,6 +103,26 @@ async function handleSubmit() {
     successMessage.value = 'Base URL set successfully!';
   } catch (error) {
     errorMessage.value = `Failed to set base URL: ${error}`;
+  } finally {
+    isSubmitting.value = false;
+  }
+}
+
+// 重置处理
+async function handleReset() {
+  if (isSubmitting.value) return;
+
+  isSubmitting.value = true;
+  errorMessage.value = '';
+  successMessage.value = '';
+
+  try {
+    await invoke('set_task_base_url', { url: '' });
+    setTaskBaseUrl('');
+    inputUrl.value = '';
+    successMessage.value = 'Base URL reset successfully!';
+  } catch (error) {
+    errorMessage.value = `Failed to reset base URL: ${error}`;
   } finally {
     isSubmitting.value = false;
   }
@@ -178,10 +207,8 @@ async function handleSubmit() {
   margin-top: 4px;
 }
 
-.submit-btn {
+.submit-btn, .reset-btn {
   padding: 14px 28px;
-  background-color: #007bff;
-  color: white;
   border: none;
   border-radius: 8px;
   font-size: 1.1rem;
@@ -190,6 +217,11 @@ async function handleSubmit() {
   transition: all 0.3s ease;
   align-self: center;
   min-width: 180px;
+}
+
+.submit-btn {
+  background-color: #007bff;
+  color: white;
 }
 
 .submit-btn:hover:not(.disabled) {
@@ -208,6 +240,24 @@ async function handleSubmit() {
 .submit-btn.loading {
   background-color: #007bff;
   cursor: wait;
+}
+
+.reset-btn {
+  background-color: #dc3545;
+  color: white;
+}
+
+.reset-btn:hover:not(:disabled) {
+  background-color: #c82333;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(220, 53, 69, 0.3);
+}
+
+.reset-btn:disabled {
+  background-color: #6c757d;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
 }
 
 .error-message {

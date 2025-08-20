@@ -2,11 +2,13 @@ use std::sync::{Arc, LazyLock};
 
 use luneth::crawl::{self, crawler};
 use luneth_db::DbOperator;
+use tauri::AppHandle;
 use tokio::sync::Mutex;
 
 use crate::AppError;
 
 mod auto;
+mod events;
 mod specified;
 
 #[derive(Debug)]
@@ -22,6 +24,7 @@ pub static TASK_BASE_URL: LazyLock<Mutex<Option<String>>> = LazyLock::new(|| {
 });
 
 pub struct Task {
+    app_handle: AppHandle,
     db: Arc<DbOperator>,
     task_type: TaskType,
     crawler: crawler::WebCrawler,
@@ -43,7 +46,11 @@ impl Task {
         crawler::WebCrawler::with_config(config).map_err(AppError::CrawlError)
     }
 
-    pub async fn new_auto(db: Arc<DbOperator>, start_url: String) -> Result<Self, AppError> {
+    pub async fn new_auto(
+        app_handle: AppHandle,
+        db: Arc<DbOperator>,
+        start_url: String,
+    ) -> Result<Self, AppError> {
         log::debug!("Creating new auto scraping task for URL: {start_url}");
         let task_type = TaskType::Auto(start_url);
         let crawler = Self::new_crawler().await?;
@@ -52,10 +59,15 @@ impl Task {
             db,
             task_type,
             crawler,
+            app_handle,
         })
     }
 
-    pub async fn new_manual(db: Arc<DbOperator>, codes: Vec<String>) -> Result<Self, AppError> {
+    pub async fn new_manual(
+        app_handle: AppHandle,
+        db: Arc<DbOperator>,
+        codes: Vec<String>,
+    ) -> Result<Self, AppError> {
         log::debug!(
             "Creating new manual scraping task for {} codes",
             codes.len()
@@ -67,6 +79,7 @@ impl Task {
             db,
             task_type,
             crawler,
+            app_handle,
         })
     }
 
@@ -100,10 +113,10 @@ impl Task {
     }
 
     async fn crawl_manual(&self, codes: &[String]) -> Result<(), AppError> {
-        specified::crawl_codes(self.db.as_ref(), &self.crawler, codes).await
+        specified::crawl_codes(&self.app_handle, self.db.as_ref(), &self.crawler, codes).await
     }
 
     async fn crawl_auto(&self, url: &str) -> Result<(), AppError> {
-        auto::auto_crawl_page(self.db.as_ref(), &self.crawler, url).await
+        auto::auto_crawl_page(&self.app_handle, self.db.as_ref(), &self.crawler, url).await
     }
 }

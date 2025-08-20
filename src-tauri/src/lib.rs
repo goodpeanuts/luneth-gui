@@ -55,7 +55,7 @@ pub fn run() {
                 .level({
                     #[cfg(debug_assertions)]
                     {
-                        LevelFilter::Debug
+                        LevelFilter::Info
                     }
                     #[cfg(not(debug_assertions))]
                     {

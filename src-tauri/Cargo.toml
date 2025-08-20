@@ -39,6 +39,8 @@ luneth = { workspace = true }
 log = { workspace = true }
 env_logger = { workspace = true }
 
+url = "2"
+
 
 [lints]
 workspace = true

@@ -15,7 +15,7 @@ pub(crate) async fn get_records(db: &impl DbService) -> Result<Vec<RecorderModel
     log::debug!("Successfully retrieved {} records", records.len());
     Ok(records)
 }
-
+// TODO: Op errortype display
 pub(crate) async fn get_op_history(db: &impl DbService) -> Result<Vec<history_op::Model>, String> {
     log::debug!("Querying operation history from database");
     let history = db
