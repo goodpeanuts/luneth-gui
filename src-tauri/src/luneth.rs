@@ -6,24 +6,24 @@ use luneth_db::entities::record_local::Model as RecorderModel;
 use tauri::State;
 
 use crate::db::{get_op_history, get_records};
-use crate::scrap::Task;
+use crate::scrap::{Task, TASK_BASE_URL};
 use crate::AppState;
 
 #[tauri::command(rename_all = "snake_case")]
-pub fn set_crawl_base_url(url: String) {
-    // This function is a placeholder for setting the base URL for crawling.
-    // The actual implementation would depend on how the luneth library allows setting the base URL.
-    // For now, we just log the URL.
-    log::debug!("Setting crawl base URL to: {url}");
-    std::env::set_var("BASE_URL", url);
+pub async fn set_task_base_url(url: String) -> Result<(), String> {
+    log::info!("Setting task base URL to: {url}");
+    *TASK_BASE_URL.lock().await = Some(url);
+    Ok(())
 }
 
 #[tauri::command(rename_all = "snake_case")]
 pub async fn get_all_records(
     state: State<'_, Arc<AppState>>,
 ) -> Result<Vec<RecorderModel>, String> {
+    log::debug!("Fetching all records from database");
     let db = Arc::clone(&state.db);
     let records = get_records(db.as_ref()).await.map_err(|e| e.clone())?;
+    log::debug!("Retrieved {} records from database", records.len());
     Ok(records)
 }
 
@@ -31,8 +31,10 @@ pub async fn get_all_records(
 pub async fn get_all_op_history(
     state: State<'_, Arc<AppState>>,
 ) -> Result<Vec<luneth_db::history_op::Model>, String> {
+    log::debug!("Fetching operation history from database");
     let db = Arc::clone(&state.db);
     let history = get_op_history(db.as_ref()).await.map_err(|e| e.clone())?;
+    log::debug!("Retrieved {} operation history records", history.len());
     Ok(history)
 }
 
@@ -41,6 +43,7 @@ pub async fn launch_auto_scrap_task(
     state: State<'_, Arc<AppState>>,
     url: String,
 ) -> Result<(), String> {
+    log::debug!("Launching auto scraping task for URL: {url}");
     let db = Arc::clone(&state.db);
 
     // Use a blocking thread to handle non-Send types
@@ -48,13 +51,24 @@ pub async fn launch_auto_scrap_task(
         // Create a simple runtime for the async task
         let rt = tokio::runtime::Runtime::new().map_err(|e| e.to_string())?;
         rt.block_on(async move {
-            let task = Task::new_auto(db, url)?;
+            let task = Task::new_auto(db, url.clone()).await?;
+            log::debug!("Auto scraping task created for URL: {url}");
             task.exec().await?;
+            log::debug!("Auto scraping task completed successfully for URL: {url}");
             Ok::<(), String>(())
         })
     });
 
-    handle.join().map_err(|_e| "Thread panicked".to_owned())?
+    match handle.join().map_err(|_e| "Thread panicked".to_owned())? {
+        Ok(_) => {
+            log::info!("Command Auto scraping task thread completed successfully");
+            Ok(())
+        }
+        Err(e) => {
+            log::error!("Auto scraping task failed: {e}");
+            Err(e)
+        }
+    }
 }
 
 #[tauri::command(rename_all = "snake_case")]
@@ -62,6 +76,8 @@ pub async fn launch_manual_scrap_task(
     state: State<'_, Arc<AppState>>,
     codes: Vec<String>,
 ) -> Result<(), String> {
+    log::debug!("Launching manual scraping task for {} codes", codes.len());
+    log::debug!("Codes to scrape: {codes:?}");
     let db = Arc::clone(&state.db);
 
     // Use a blocking thread to handle non-Send types
@@ -69,11 +85,25 @@ pub async fn launch_manual_scrap_task(
         // Create a simple runtime for the async task
         let rt = tokio::runtime::Runtime::new().map_err(|e| e.to_string())?;
         rt.block_on(async move {
-            let task = Task::new_manual(db, codes)?;
+            let task = Task::new_manual(db, codes.clone()).await?;
+            log::debug!("Manual scraping task created for {} codes", codes.len());
             task.exec().await?;
+            log::debug!(
+                "CommandManual scraping task completed successfully for {} codes",
+                codes.len()
+            );
             Ok::<(), String>(())
         })
     });
 
-    handle.join().map_err(|_e| "Thread panicked".to_owned())?
+    match handle.join().map_err(|_e| "Thread panicked".to_owned())? {
+        Ok(_) => {
+            log::info!("Manual scraping task thread completed successfully");
+            Ok(())
+        }
+        Err(e) => {
+            log::error!("Manual scraping task failed: {e}");
+            Err(e)
+        }
+    }
 }

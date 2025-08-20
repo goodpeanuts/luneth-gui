@@ -104,7 +104,24 @@ pub(crate) fn process_text_lines(input: &str) -> ProcessResult {
 // Tauri 命令：处理文本
 #[tauri::command]
 pub(crate) fn process_text(input: &str) -> ProcessResult {
-    process_text_lines(input)
+    log::debug!("Processing text input with {} characters", input.len());
+    let lines_count = input.lines().count();
+    log::debug!("Input contains {lines_count} lines");
+
+    let result = process_text_lines(input);
+
+    log::info!(
+        "Text processing completed: {} valid extractions, {} duplicate groups, {} error lines",
+        result.output_lines.len(),
+        result.duplicate_groups.len(),
+        result
+            .input_lines
+            .iter()
+            .filter(|l| matches!(l.status, LineStatus::Error))
+            .count()
+    );
+
+    result
 }
 
 // Tauri 命令：更新行选中状态
@@ -113,9 +130,16 @@ pub(crate) fn toggle_line_selection(
     mut process_result: ProcessResult,
     extracted_content: &str,
 ) -> ProcessResult {
+    log::debug!("Toggling selection for extracted content: {extracted_content}");
+
     // 查找所有具有相同提取内容的行
     if let Some(line_numbers) = process_result.duplicate_groups.get(extracted_content) {
         let line_numbers = line_numbers.clone();
+        log::debug!(
+            "Found {} lines with content '{}'",
+            line_numbers.len(),
+            extracted_content
+        );
 
         // 检查当前状态，如果已经是Selected则恢复为Duplicate，否则设为Selected
         let Some(first_line) = process_result
@@ -123,6 +147,7 @@ pub(crate) fn toggle_line_selection(
             .iter()
             .find(|l| l.line_number == line_numbers[0])
         else {
+            log::warn!("Could not find line with number: {}", line_numbers[0]);
             return process_result;
         };
 
@@ -130,6 +155,8 @@ pub(crate) fn toggle_line_selection(
             LineStatus::Selected => LineStatus::Duplicate,
             _ => LineStatus::Selected,
         };
+
+        log::debug!("Changing status to: {new_status:?}");
 
         // 更新所有相关行的状态
         for line_number in line_numbers {
@@ -141,6 +168,8 @@ pub(crate) fn toggle_line_selection(
                 line_result.status = new_status.clone();
             }
         }
+    } else {
+        log::debug!("No duplicate group found for content: {extracted_content}");
     }
 
     process_result
@@ -148,7 +177,20 @@ pub(crate) fn toggle_line_selection(
 
 // Tauri 命令：导出结果到文件
 #[tauri::command]
-pub(crate) async fn export_to_file(_content: String) -> Result<String, String> {
+pub(crate) async fn export_to_file(content: String) -> Result<String, String> {
+    log::debug!(
+        "Export request received for content with {} characters",
+        content.len()
+    );
+    log::debug!(
+        "Export content preview: {}...",
+        if content.len() > 100 {
+            &content[..100]
+        } else {
+            &content
+        }
+    );
+
     // 这里我们返回一个成功消息，实际的文件保存将在前端处理
     Ok("准备导出".to_owned())
 }

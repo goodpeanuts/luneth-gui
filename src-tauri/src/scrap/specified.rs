@@ -15,6 +15,10 @@ pub async fn crawl_codes<T>(
 where
     T: AsRef<str> + Debug,
 {
+    log::debug!("Starting to crawl {} codes", codes.len());
+    let mut success_count = 0;
+    let mut error_count = 0;
+
     for code in codes {
         let code = code.as_ref();
         log::debug!("Crawling code: {code}");
@@ -25,18 +29,32 @@ where
                 let insert_result = db.insert_entity(record_model).await;
 
                 match insert_result {
-                    Ok(_) => log_success_crawl_op(db, code).await?,
+                    Ok(_) => {
+                        log_success_crawl_op(db, code).await?;
+                        success_count += 1;
+                        log::debug!("Successfully crawled and saved code: {code}");
+                    }
                     Err(e) => {
                         log::error!("Failed to insert record for code {code}: {e}");
                         log_failed_crawl_op(db, code, e.to_string()).await?;
+                        error_count += 1;
                     }
                 };
             }
             Err(e) => {
-                log::error!("Failed to crawl code {code}: {e}");
+                log::warn!("Failed to crawl code {code}: {e}");
                 log_failed_crawl_op(db, code, e.to_string()).await?;
+                error_count += 1;
             }
         }
     }
+
+    log::info!(
+        "Crawling completed: {} successful, {} errors out of {} total codes",
+        success_count,
+        error_count,
+        codes.len()
+    );
+
     Ok(())
 }

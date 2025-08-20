@@ -1,0 +1,365 @@
+<template>
+  <div class="record-list-view">
+    <div class="list-header">
+      <h2 class="list-title">Records</h2>
+      <button class="refresh-btn" @click="loadRecords" :disabled="isLoading">
+        <span v-if="isLoading">Loading...</span>
+        <span v-else>🔄 Refresh</span>
+      </button>
+    </div>
+
+    <div v-if="isLoading" class="loading-state">
+      <div class="loading-spinner"></div>
+      <p>Loading records...</p>
+    </div>
+
+    <div v-else-if="error" class="error-state">
+      <div class="error-icon">❌</div>
+      <p class="error-text">{{ error }}</p>
+      <button class="retry-btn" @click="loadRecords">Retry</button>
+    </div>
+
+    <div v-else-if="records.length === 0" class="empty-state">
+      <div class="empty-icon">📝</div>
+      <p class="empty-text">No records found</p>
+      <p class="empty-hint">Start crawling to create records</p>
+      <button class="crawl-btn" @click="navigateTo('crawl')">
+        Go to Crawl
+      </button>
+    </div>
+
+    <div v-else class="records-container">
+      <div class="records-list">
+        <div
+          v-for="record in records"
+          :key="record.id"
+          class="record-item"
+          @click="openRecordDetail(record)"
+        >
+          <div class="record-thumbnail">
+            <img
+              v-if="record.cover"
+              :src="record.cover"
+              :alt="record.title"
+              class="record-cover"
+              @error="handleImageError"
+            />
+            <div v-else class="record-cover-placeholder">
+              <span>🎬</span>
+            </div>
+          </div>
+
+          <div class="record-info">
+            <div class="record-header">
+              <h3 class="record-title">{{ record.title || 'Untitled' }}</h3>
+              <div class="record-badges">
+                <span v-if="record.is_liked" class="badge liked">❤️</span>
+                <span v-if="record.is_submitted" class="badge submitted">✅</span>
+              </div>
+            </div>
+
+            <div class="record-meta">
+              <div class="meta-item">
+                <span class="meta-label">ID:</span>
+                <span class="meta-value">{{ record.id }}</span>
+              </div>
+              <div class="meta-item">
+                <span class="meta-label">Release:</span>
+                <span class="meta-value">{{ record.release_date || 'Unknown' }}</span>
+              </div>
+              <div class="meta-item">
+                <span class="meta-label">Created:</span>
+                <span class="meta-value">{{ formatDate(record.created_at) }}</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="record-arrow">
+            <span>→</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</template>
+
+<script setup lang="ts">
+import { ref, onMounted } from 'vue';
+import { invoke } from '@tauri-apps/api/core';
+import type { RecordModel } from '@/types';
+import { navigateTo, appState } from '@/store';
+
+const records = ref<RecordModel[]>([]);
+const isLoading = ref(false);
+const error = ref('');
+
+onMounted(() => {
+  loadRecords();
+});
+
+async function loadRecords() {
+  isLoading.value = true;
+  error.value = '';
+
+  try {
+    const result = await invoke<RecordModel[]>('get_all_records');
+    records.value = result;
+  } catch (err) {
+    error.value = `Failed to load records: ${err}`;
+  } finally {
+    isLoading.value = false;
+  }
+}
+
+function openRecordDetail(record: RecordModel) {
+  // Store the selected record in app state for detail view
+  appState.selectedRecord = record;
+  navigateTo('record_detail');
+}
+
+function formatDate(dateString: string): string {
+  try {
+    return new Date(dateString).toLocaleDateString();
+  } catch {
+    return 'Invalid date';
+  }
+}
+
+function handleImageError(event: Event) {
+  const img = event.target as HTMLImageElement;
+  img.style.display = 'none';
+}
+</script>
+
+<style scoped>
+.record-list-view {
+  padding: 24px;
+  height: 100vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.list-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+  padding-bottom: 16px;
+  border-bottom: 2px solid #e9ecef;
+}
+
+.list-title {
+  font-size: 2rem;
+  font-weight: 700;
+  color: #333;
+  margin: 0;
+}
+
+.refresh-btn {
+  padding: 8px 16px;
+  background-color: #28a745;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: background-color 0.2s ease;
+}
+
+.refresh-btn:hover:not(:disabled) {
+  background-color: #218838;
+}
+
+.refresh-btn:disabled {
+  background-color: #6c757d;
+  cursor: not-allowed;
+}
+
+.loading-state, .error-state, .empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  gap: 16px;
+}
+
+.loading-spinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid #f3f3f3;
+  border-top: 4px solid #007bff;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.error-icon, .empty-icon {
+  font-size: 4rem;
+  opacity: 0.6;
+}
+
+.error-text, .empty-text {
+  font-size: 1.2rem;
+  color: #666;
+  margin: 0;
+}
+
+.empty-hint {
+  color: #999;
+  margin: 0;
+}
+
+.retry-btn, .crawl-btn {
+  padding: 12px 24px;
+  background-color: #007bff;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 1rem;
+  transition: background-color 0.2s ease;
+}
+
+.retry-btn:hover, .crawl-btn:hover {
+  background-color: #0056b3;
+}
+
+.records-container {
+  flex: 1;
+  overflow: hidden;
+}
+
+.records-list {
+  height: 100%;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.record-item {
+  display: flex;
+  align-items: center;
+  background: white;
+  border: 1px solid #e9ecef;
+  border-radius: 12px;
+  padding: 16px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  gap: 16px;
+}
+
+.record-item:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  border-color: #007bff;
+}
+
+.record-thumbnail {
+  width: 80px;
+  height: 80px;
+  flex-shrink: 0;
+  border-radius: 8px;
+  overflow: hidden;
+  background-color: #f8f9fa;
+}
+
+.record-cover {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.record-cover-placeholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2rem;
+  color: #6c757d;
+}
+
+.record-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.record-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 12px;
+}
+
+.record-title {
+  font-size: 1.2rem;
+  font-weight: 600;
+  color: #333;
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 400px;
+}
+
+.record-badges {
+  display: flex;
+  gap: 8px;
+}
+
+.badge {
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 0.8rem;
+  font-weight: 500;
+}
+
+.badge.liked {
+  background-color: #ffe6e6;
+  color: #dc3545;
+}
+
+.badge.submitted {
+  background-color: #e6f7e6;
+  color: #28a745;
+}
+
+.record-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.meta-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.9rem;
+}
+
+.meta-label {
+  font-weight: 600;
+  color: #666;
+  min-width: 60px;
+}
+
+.meta-value {
+  color: #333;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.record-arrow {
+  color: #6c757d;
+  font-size: 1.2rem;
+  font-weight: bold;
+}
+</style>

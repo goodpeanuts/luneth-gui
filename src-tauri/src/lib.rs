@@ -10,8 +10,15 @@ use ::luneth::crawl::CrawlError;
 use extract::{export_to_file, process_text, toggle_line_selection};
 use luneth::{
     get_all_op_history, get_all_records, launch_auto_scrap_task, launch_manual_scrap_task,
-    set_crawl_base_url,
+    set_task_base_url,
 };
+use tauri::Manager as _;
+
+#[cfg(debug_assertions)]
+use log::LevelFilter;
+
+#[cfg(not(debug_assertions))]
+use log::LevelFilter;
 
 pub(crate) struct AppState {
     pub db: Arc<luneth_db::DbOperator>,
@@ -36,9 +43,57 @@ impl From<AppError> for String {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .plugin(
+            tauri_plugin_log::Builder::default()
+                .targets([
+                    tauri_plugin_log::Target::new(tauri_plugin_log::TargetKind::Stdout),
+                    tauri_plugin_log::Target::new(tauri_plugin_log::TargetKind::LogDir {
+                        file_name: None,
+                    }),
+                    tauri_plugin_log::Target::new(tauri_plugin_log::TargetKind::Webview),
+                ])
+                .level({
+                    #[cfg(debug_assertions)]
+                    {
+                        LevelFilter::Debug
+                    }
+                    #[cfg(not(debug_assertions))]
+                    {
+                        LevelFilter::Info
+                    }
+                })
+                .build(),
+        )
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_dialog::init())
+        .setup(|app| {
+            log::info!("Starting Tauri application setup");
+
+            // Initialize database connection using a runtime
+            let app_handle = app.handle().clone();
+            let rt = tokio::runtime::Runtime::new().map_err(|e| {
+                log::error!("Failed to create tokio runtime: {e}");
+                Box::new(std::io::Error::other(e.to_string()))
+            })?;
+
+            log::debug!("Initializing database connection");
+            let db_result = rt.block_on(async { luneth_db::DbOperator::init(&app_handle).await });
+
+            match db_result {
+                Ok(db) => {
+                    log::info!("Database initialized successfully");
+                    let app_state = AppState { db: Arc::new(db) };
+                    app.manage(Arc::new(app_state));
+                    log::info!("Application setup completed successfully");
+                    Ok(())
+                }
+                Err(e) => {
+                    log::error!("Failed to initialize database: {e}");
+                    Err(Box::new(std::io::Error::other(e.to_string())))
+                }
+            }
+        })
         .invoke_handler(tauri::generate_handler![
             process_text,
             toggle_line_selection,
@@ -47,7 +102,7 @@ pub fn run() {
             launch_auto_scrap_task,
             launch_manual_scrap_task,
             get_all_op_history,
-            set_crawl_base_url
+            set_task_base_url
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -59,19 +59,31 @@ impl DbOperator {
         let db_sqlite = DbBackend::Sqlite;
 
         // 创建 record_local 表
-        let stmt = db_sqlite.build(&schema.create_table_from_entity(record_local::Entity));
+        let mut stmt = db_sqlite.build(&schema.create_table_from_entity(record_local::Entity));
+        stmt.sql = stmt
+            .sql
+            .replace("CREATE TABLE", "CREATE TABLE IF NOT EXISTS");
         self.execute_db_stmt(stmt).await?;
 
         // 创建 record_remote 表
-        let stmt = db_sqlite.build(&schema.create_table_from_entity(record_remote::Entity));
+        let mut stmt = db_sqlite.build(&schema.create_table_from_entity(record_remote::Entity));
+        stmt.sql = stmt
+            .sql
+            .replace("CREATE TABLE", "CREATE TABLE IF NOT EXISTS");
         self.execute_db_stmt(stmt).await?;
 
         // 创建 history_op 表
-        let stmt = db_sqlite.build(&schema.create_table_from_entity(history_op::Entity));
+        let mut stmt = db_sqlite.build(&schema.create_table_from_entity(history_op::Entity));
+        stmt.sql = stmt
+            .sql
+            .replace("CREATE TABLE", "CREATE TABLE IF NOT EXISTS");
         self.execute_db_stmt(stmt).await?;
 
         // 创建 history_task 表
-        let stmt = db_sqlite.build(&schema.create_table_from_entity(history_task::Entity));
+        let mut stmt = db_sqlite.build(&schema.create_table_from_entity(history_task::Entity));
+        stmt.sql = stmt
+            .sql
+            .replace("CREATE TABLE", "CREATE TABLE IF NOT EXISTS");
         self.execute_db_stmt(stmt).await?;
 
         Ok(())
