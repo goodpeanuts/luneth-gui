@@ -1,6 +1,10 @@
 <template>
-  <div class="progress-container">
-    <div v-for="progress in progressList" :key="progress.id" class="progress-item">
+  <div
+    class="progress-container"
+    v-if="progressState.isVisible"
+    :data-count="progressState.progressList.length > 5 ? 'many' : 'few'"
+  >
+    <div v-for="progress in progressState.progressList" :key="progress.id" class="progress-item">
       <div class="progress-header">
         <div class="progress-info">
           <span class="progress-name">{{ progress.name }}</span>
@@ -34,21 +38,16 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue';
+import { onMounted, onUnmounted } from 'vue';
 import { listen } from '@tauri-apps/api/event';
-
-// Progress status types
-type ProgressStatus = 'pending' | 'in-progress' | 'success' | 'failed' | 'mixed';
-
-// Progress item interface
-interface ProgressItem {
-  id: string;
-  name: string;
-  current: number;
-  total: number;
-  status: ProgressStatus;
-  errorMessage?: string;
-}
+import {
+  progressState,
+  scrapTaskState,
+  findOrCreateProgress,
+  updateProgressStatus,
+  resetProgress
+} from '@/store';
+import type { ProgressStatus, ProgressItem } from '@/types';
 
 // Event interfaces
 interface CrawlPageStartEvent {
@@ -81,13 +80,7 @@ interface CrawlManualStartEvent {
   totalCount: number;
 }
 
-const progressList = ref<ProgressItem[]>([]);
 let unlistenFunctions: (() => void)[] = [];
-
-// Reset progress when starting new crawl
-const resetProgress = () => {
-  progressList.value = [];
-};
 
 // Get status class for styling
 const getStatusClass = (status: ProgressStatus): string => {
@@ -174,49 +167,37 @@ const truncateMessage = (message: string): string => {
   return message.length > maxLength ? `${message.substring(0, maxLength)}...` : message;
 };
 
-// Find or create progress item
-const findOrCreateProgress = (name: string): ProgressItem => {
-  let progress = progressList.value.find(p => p.name === name);
-  if (!progress) {
-    progress = {
-      id: `${Date.now()}-${Math.random()}`,
-      name,
-      current: 0,
-      total: -1,
-      status: 'pending'
-    };
-    progressList.value.push(progress);
-  }
-  return progress;
-};
-
-// Update progress status based on results
-const updateProgressStatus = (progress: ProgressItem) => {
-  if (progress.current === 0) {
-    progress.status = 'pending';
-  } else if (progress.current < progress.total) {
-    progress.status = 'in-progress';
-  } else {
-    // Check if there were any failures based on the name pattern
-    // For auto mode, we'll rely on the crawl-codes-finished event
-    progress.status = 'success';
-  }
-};
-
 // Set up event listeners
 onMounted(async () => {
   try {
     // Manual mode start
     const unlistenManualStart = await listen<CrawlManualStartEvent>('crawl-manual-start', (event) => {
-      resetProgress();
-      const progress = findOrCreateProgress('Manual Crawl');
-      progress.total = event.payload.totalCount;
-      progress.current = 0;
-      progress.status = 'in-progress';
+      // 使用全局任务类型来判断是否是纯manual模式
+      const isManualMode = scrapTaskState.taskType === 'manual';
+
+      if (isManualMode) {
+        // 纯manual模式：清空所有进度条并创建新的
+        resetProgress();
+        const progress = findOrCreateProgress('Manual Crawl');
+        progress.total = event.payload.totalCount;
+        progress.current = 0;
+        progress.status = 'in-progress';
+      } else {
+        // Auto模式中的manual步骤：不重置进度条，更新最新的页面进度条
+        const latestPageProgress = progressState.progressList
+          .filter((p: ProgressItem) => p.name !== 'Manual Crawl')
+          .sort((a: ProgressItem, b: ProgressItem) => b.createdAt - a.createdAt)[0];
+
+        if (latestPageProgress) {
+          latestPageProgress.total = event.payload.totalCount;
+          latestPageProgress.current = 0;
+          latestPageProgress.status = 'in-progress';
+        }
+      }
     });
     unlistenFunctions.push(unlistenManualStart);
 
-    // Page start (auto mode)
+    // Page start (auto mode) - 新页面应该在顶部创建
     const unlistenPageStart = await listen<CrawlPageStartEvent>('crawl-page-start', (event) => {
       const progress = findOrCreateProgress(event.payload.pageName);
       progress.status = 'pending';
@@ -246,14 +227,15 @@ onMounted(async () => {
       // Find the appropriate progress bar to update
       let targetProgress: ProgressItem | undefined;
 
-      if (progressList.value.length === 1) {
-        // Manual mode - single progress bar
-        targetProgress = progressList.value[0];
+      if (scrapTaskState.taskType === 'auto') {
+        // Auto模式：更新最新的in-progress页面进度条
+        const autoModeProgresses = progressState.progressList.filter((p: ProgressItem) => p.name !== 'Manual Crawl');
+        targetProgress = autoModeProgresses
+          .filter((p: ProgressItem) => p.status === 'in-progress')
+          .sort((a: ProgressItem, b: ProgressItem) => b.createdAt - a.createdAt)[0];
       } else {
-        // Auto mode - find the latest in-progress page
-        targetProgress = progressList.value
-          .filter(p => p.status === 'in-progress')
-          .sort((a, b) => b.id.localeCompare(a.id))[0];
+        // Manual模式：更新Manual Crawl进度条
+        targetProgress = progressState.progressList.find((p: ProgressItem) => p.name === 'Manual Crawl');
       }
 
       if (targetProgress) {
@@ -268,14 +250,15 @@ onMounted(async () => {
       // Find the progress to update
       let targetProgress: ProgressItem | undefined;
 
-      if (progressList.value.length === 1) {
-        // Manual mode
-        targetProgress = progressList.value[0];
+      if (scrapTaskState.taskType === 'auto') {
+        // Auto模式：更新最新的in-progress页面进度条
+        const autoModeProgresses = progressState.progressList.filter((p: ProgressItem) => p.name !== 'Manual Crawl');
+        targetProgress = autoModeProgresses
+          .filter((p: ProgressItem) => p.status === 'in-progress')
+          .sort((a: ProgressItem, b: ProgressItem) => b.createdAt - a.createdAt)[0];
       } else {
-        // Auto mode - find the latest in-progress page
-        targetProgress = progressList.value
-          .filter(p => p.status === 'in-progress')
-          .sort((a, b) => b.id.localeCompare(a.id))[0];
+        // Manual模式：更新Manual Crawl进度条
+        targetProgress = progressState.progressList.find((p: ProgressItem) => p.name === 'Manual Crawl');
       }
 
       if (targetProgress) {
@@ -313,33 +296,58 @@ defineExpose({
 
 <style scoped>
 .progress-container {
-  margin-top: 24px;
-  border: 1px solid #e1e5e9;
-  border-radius: 12px;
-  background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%);
   padding: 20px;
-  max-height: 400px;
-  overflow-y: auto;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-radius: 16px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+  margin: 16px 0;
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  max-height: 70vh; /* 限制最大高度为视口高度的70% */
+  overflow-y: auto; /* 支持垂直滚动 */
+  overflow-x: hidden;
+  position: relative;
 }
 
 .progress-item {
-  margin-bottom: 16px;
-  background: white;
-  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.95);
+  border-radius: 12px;
   padding: 16px;
-  border: 1px solid #e9ecef;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
-  transition: all 0.2s ease;
+  margin-bottom: 12px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.05);
+  transition: all 0.3s ease;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  position: relative;
+  /* 新进度条的入场动画 */
+  animation: slideInFromTop 0.4s ease-out;
 }
 
-.progress-item:hover {
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-  transform: translateY(-1px);
+@keyframes slideInFromTop {
+  0% {
+    opacity: 0;
+    transform: translateY(-20px);
+    max-height: 0;
+    margin-bottom: 0;
+    padding-top: 0;
+    padding-bottom: 0;
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+    max-height: 200px; /* 估算的最大高度 */
+    margin-bottom: 12px;
+    padding-top: 16px;
+    padding-bottom: 16px;
+  }
 }
 
 .progress-item:last-child {
   margin-bottom: 0;
+}
+
+.progress-item:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
 }
 
 .progress-header {
@@ -357,108 +365,96 @@ defineExpose({
 
 .progress-name {
   font-weight: 600;
-  color: #2c3e50;
-  font-size: 0.95rem;
+  font-size: 16px;
+  color: #2d3748;
+  word-break: break-word; /* 长文本换行 */
 }
 
 .progress-count {
-  font-size: 0.8rem;
-  color: #6c757d;
-  font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
+  font-size: 14px;
+  color: #718096;
+  font-family: 'Courier New', monospace;
 }
 
 .progress-status-badge {
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 4px 8px;
-  border-radius: 6px;
-  font-size: 0.75rem;
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 12px;
   font-weight: 500;
-  white-space: nowrap;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  white-space: nowrap; /* 防止状态文本换行 */
 }
 
 .status-pending {
-  background-color: #f8f9fa;
-  color: #6c757d;
-  border: 1px solid #dee2e6;
+  background: linear-gradient(135deg, #ffeaa7, #fdcb6e);
+  color: #8b5a00;
 }
 
 .status-progress {
-  background-color: #e3f2fd;
-  color: #1976d2;
-  border: 1px solid #bbdefb;
+  background: linear-gradient(135deg, #74b9ff, #0984e3);
+  color: white;
 }
 
 .status-success {
-  background-color: #e8f5e8;
-  color: #2e7d32;
-  border: 1px solid #c8e6c9;
+  background: linear-gradient(135deg, #55efc4, #00b894);
+  color: white;
 }
 
 .status-failed {
-  background-color: #ffebee;
-  color: #c62828;
-  border: 1px solid #ffcdd2;
+  background: linear-gradient(135deg, #fd79a8, #e84393);
+  color: white;
 }
 
 .status-mixed {
-  background-color: #fff8e1;
-  color: #f57c00;
-  border: 1px solid #ffecb3;
-}
-
-.status-icon {
-  font-size: 0.8rem;
-}
-
-.status-text {
-  font-weight: 600;
+  background: linear-gradient(135deg, #fdcb6e, #e17055);
+  color: white;
 }
 
 .progress-bar-wrapper {
   display: flex;
   align-items: center;
   gap: 12px;
-  margin-bottom: 8px;
 }
 
 .progress-bar-track {
   flex: 1;
   height: 8px;
-  background-color: #f1f3f4;
-  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.05);
+  border-radius: 8px;
   overflow: hidden;
   position: relative;
-  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.1);
 }
 
 .progress-bar-fill {
   height: 100%;
-  border-radius: 4px;
+  border-radius: 8px;
   transition: width 0.3s ease;
   position: relative;
   overflow: hidden;
 }
 
 .bar-pending {
-  background-color: #9e9e9e;
+  background: linear-gradient(90deg, #ffeaa7, #fdcb6e);
 }
 
 .bar-progress {
-  background: linear-gradient(90deg, #42a5f5 0%, #2196f3 100%);
+  background: linear-gradient(90deg, #74b9ff, #0984e3);
 }
 
 .bar-success {
-  background: linear-gradient(90deg, #66bb6a 0%, #4caf50 100%);
+  background: linear-gradient(90deg, #55efc4, #00b894);
 }
 
 .bar-failed {
-  background: linear-gradient(90deg, #ef5350 0%, #f44336 100%);
+  background: linear-gradient(90deg, #fd79a8, #e84393);
 }
 
 .bar-mixed {
-  background: linear-gradient(90deg, #ffb74d 0%, #ff9800 100%);
+  background: linear-gradient(90deg, #fdcb6e, #e17055);
 }
 
 .progress-shine {
@@ -473,66 +469,119 @@ defineExpose({
     rgba(255, 255, 255, 0.4),
     transparent
   );
-  animation: shine 1.5s infinite;
+  animation: shine 2s infinite;
 }
 
 @keyframes shine {
-  0% {
-    left: -100%;
-  }
-  100% {
-    left: 100%;
-  }
+  0% { left: -100%; }
+  100% { left: 100%; }
 }
 
 .progress-percentage {
-  font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
-  font-size: 0.8rem;
+  font-size: 14px;
   font-weight: 600;
-  color: #495057;
-  min-width: 35px;
+  color: #4a5568;
+  min-width: 40px;
   text-align: right;
+  font-family: 'Courier New', monospace;
 }
 
 .error-message {
+  margin-top: 8px;
+  padding: 8px 12px;
+  background: rgba(255, 107, 107, 0.1);
+  border: 1px solid rgba(255, 107, 107, 0.2);
+  border-radius: 8px;
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-top: 8px;
-  padding: 8px 12px;
-  background-color: #ffebee;
-  border: 1px solid #ffcdd2;
-  border-radius: 6px;
-  color: #c62828;
-  font-size: 0.8rem;
 }
 
 .error-icon {
-  font-size: 0.9rem;
-  flex-shrink: 0;
+  font-size: 14px;
 }
 
 .error-text {
-  font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
-  word-break: break-all;
+  font-size: 13px;
+  color: #c53030;
+  flex: 1;
+  word-break: break-word;
 }
 
-/* Scrollbar styling */
+/* 自定义滚动条样式 */
 .progress-container::-webkit-scrollbar {
-  width: 6px;
+  width: 12px;
 }
 
 .progress-container::-webkit-scrollbar-track {
-  background: #f1f1f1;
-  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  margin: 4px;
 }
 
 .progress-container::-webkit-scrollbar-thumb {
-  background: #c1c1c1;
-  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.4);
+  border-radius: 6px;
+  border: 2px solid transparent;
+  background-clip: content-box;
 }
 
 .progress-container::-webkit-scrollbar-thumb:hover {
-  background: #a8a8a8;
+  background: rgba(255, 255, 255, 0.6);
+  background-clip: content-box;
+}
+
+/* 滚动指示器 */
+.progress-container::before {
+  content: '';
+  position: sticky;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.5), transparent);
+  pointer-events: none;
+  z-index: 1;
+}
+
+.progress-container::after {
+  content: '';
+  position: sticky;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.5), transparent);
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+  .progress-container {
+    padding: 16px;
+    margin: 12px 0;
+    max-height: 60vh;
+  }
+
+  .progress-item {
+    padding: 12px;
+    margin-bottom: 8px;
+  }
+
+  .progress-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+
+  .progress-status-badge {
+    align-self: flex-start;
+  }
+}
+
+/* 当进度条很多时的视觉提示 */
+.progress-container[data-count="many"] {
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.1);
 }
 </style>

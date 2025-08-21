@@ -78,26 +78,47 @@
       </div>
 
       <!-- Progress Tracker -->
-      <ProgressTracker ref="progressTracker" v-if="showProgress" />
+      <ProgressTracker ref="progressTracker" />
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue';
+import { ref, computed, watch, onMounted } from 'vue';
 import { invoke } from '@tauri-apps/api/core';
-import { navigateTo, checkTaskBaseUrl } from '@/store';
+import {
+  navigateTo,
+  checkTaskBaseUrl,
+  progressState,
+  scrapTaskState,
+  showProgress as showProgressGlobal,
+  hideProgress,
+  resetProgress
+} from '@/store';
 import type { ScrapTaskType } from '@/types';
 import ProgressTracker from '@/components/ProgressTracker.vue';
 
-const taskType = ref<ScrapTaskType | ''>('');
 const urlInput = ref('');
 const codesInput = ref('');
 const isProcessing = ref(false);
 const errorMessage = ref('');
 const successMessage = ref('');
-const showProgress = ref(false);
 const progressTracker = ref<InstanceType<typeof ProgressTracker>>();
+
+// 使用全局任务类型状态
+const taskType = computed({
+  get: () => scrapTaskState.taskType || '',
+  set: (value: ScrapTaskType | '') => {
+    scrapTaskState.taskType = value as ScrapTaskType | null;
+  }
+});
+
+// 在组件挂载时，如果有进度数据就显示进度组件
+onMounted(() => {
+  if (progressState.progressList.length > 0) {
+    showProgressGlobal();
+  }
+});
 
 // 计算属性
 const canLaunch = computed(() => {
@@ -111,10 +132,13 @@ const canLaunch = computed(() => {
 });
 
 // 监听任务类型变化，清空错误信息
-watch(taskType, () => {
+watch(taskType, (newType) => {
   errorMessage.value = '';
   successMessage.value = '';
-  showProgress.value = false;
+  // 切换到manual模式时清空进度条，auto模式保留
+  if (newType === 'manual') {
+    hideProgress();
+  }
 });
 
 // 监听输入变化，清空错误信息
@@ -139,11 +163,15 @@ async function handleLaunch() {
   isProcessing.value = true;
   errorMessage.value = '';
   successMessage.value = '';
-  showProgress.value = true;
+  showProgressGlobal();
 
-  // Reset progress tracker
-  if (progressTracker.value) {
-    progressTracker.value.resetProgress();
+  // 设置全局任务类型
+  scrapTaskState.taskType = taskType.value as ScrapTaskType;
+  scrapTaskState.isProcessing = true;
+
+  // Manual模式才重置进度条，Auto模式保留已有进度条
+  if (taskType.value === 'manual') {
+    resetProgress();
   }
 
   try {
@@ -163,6 +191,7 @@ async function handleLaunch() {
     errorMessage.value = `Scraping task failed: ${error}`;
   } finally {
     isProcessing.value = false;
+    scrapTaskState.isProcessing = false;
   }
 }
 </script>
