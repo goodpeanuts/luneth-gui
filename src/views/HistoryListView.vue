@@ -2,13 +2,29 @@
   <div class="history-list-view">
     <div class="list-header">
       <h2 class="list-title">Operation History</h2>
-      <button class="refresh-btn" @click="loadHistory" :disabled="isLoading">
-        <span v-if="isLoading">Loading...</span>
-        <span v-else">🔄 Refresh</span>
-      </button>
+      <div class="header-controls">
+        <div class="filter-controls">
+          <select v-model="filterOperation" class="filter-select">
+            <option value="">All Operations</option>
+            <option v-for="op in uniqueOperations" :key="op" :value="op">{{ op }}</option>
+          </select>
+          <select v-model="filterStatus" class="filter-select">
+            <option value="">All Status</option>
+            <option value="SUCCESS">Success</option>
+            <option value="FAILED">Failed</option>
+          </select>
+          <button class="clear-filter-btn" @click="clearFilters" v-if="hasActiveFilters">
+            Clear Filters
+          </button>
+        </div>
+        <button class="refresh-btn" @click="loadHistory" :disabled="isLoading">
+          <span v-if="isLoading && hasCached == false">Loading...</span>
+          <span v-else>🔄 Refresh</span>
+        </button>
+      </div>
     </div>
 
-    <div v-if="isLoading" class="loading-state">
+    <div v-if="isLoading && history.length === 0" class="loading-state">
       <div class="loading-spinner"></div>
       <p>Loading history...</p>
     </div>
@@ -19,59 +35,43 @@
       <button class="retry-btn" @click="loadHistory">Retry</button>
     </div>
 
-    <div v-else-if="history.length === 0" class="empty-state">
+    <div v-else-if="filteredHistory.length === 0" class="empty-state">
       <div class="empty-icon">📜</div>
-      <p class="empty-text">No operation history found</p>
-      <p class="empty-hint">History will appear here after performing operations</p>
+      <p class="empty-text">{{ hasActiveFilters ? 'No records match the current filters' : 'No operation history found'
+        }}</p>
+      <p class="empty-hint" v-if="!hasActiveFilters">History will appear here after performing operations</p>
+      <button v-if="hasActiveFilters" class="clear-filter-btn" @click="clearFilters">
+        Clear Filters
+      </button>
     </div>
 
     <div v-else class="history-container">
-      <div class="history-list">
-        <div
-          v-for="item in history"
-          :key="item.id"
-          class="history-item"
-          :class="{ 'success': item.status === 'Success', 'failed': item.status === 'Failed' }"
-        >
-          <div class="history-icon">
-            <span v-if="item.operation === 'Create'">➕</span>
-            <span v-else-if="item.operation === 'Update'">✏️</span>
-            <span v-else-if="item.operation === 'Delete'">🗑️</span>
-            <span v-else>🔄</span>
-          </div>
+      <div class="history-stats" v-if="hasActiveFilters">
+        <span class="stats-text">
+          Showing {{ filteredHistory.length }} of {{ history.length }} records
+        </span>
+      </div>
 
-          <div class="history-info">
-            <div class="history-header">
-              <h3 class="history-operation">{{ item.operation }}</h3>
-              <div class="history-badges">
-                <span
-                  class="status-badge"
-                  :class="{
-                    'success': item.status === 'Success',
-                    'failed': item.status === 'Failed'
-                  }"
-                >
-                  {{ item.status }}
-                </span>
+      <div class="history-list">
+        <div v-for="item in filteredHistory" :key="item.id" class="history-item"
+          :class="{ 'success': item.status === 'SUCCESS', 'failed': item.status === 'FAILED' }">
+          <div class="history-content">
+            <div class="history-left">
+              <div class="operation-header">
+                <div class="operation-name">{{ item.operation || 'Unknown' }}</div>
+                <div class="operation-status" :class="{ 'success': item.status === 'SUCCESS', 'failed': item.status === 'FAILED' }">
+                  {{ item.status || 'Unknown' }}
+                </div>
+              </div>
+              <div class="history-info">
+                <div class="recorder-id">{{ item.recorder_id || 'N/A' }}</div>
+                <div class="operation-timestamp">{{ formatDateTime(item.timestamp) }}</div>
               </div>
             </div>
 
-            <div class="history-meta">
-              <div class="meta-item">
-                <span class="meta-label">Record ID:</span>
-                <span class="meta-value">{{ item.id }}</span>
-              </div>
-              <div class="meta-item">
-                <span class="meta-label">User:</span>
-                <span class="meta-value">{{ item.user || 'System' }}</span>
-              </div>
-              <div class="meta-item">
-                <span class="meta-label">Time:</span>
-                <span class="meta-value">{{ formatDateTime(item.timestamp) }}</span>
-              </div>
-              <div class="meta-item">
-                <span class="meta-label">Created:</span>
-                <span class="meta-value">{{ formatDateTime(item.created_at) }}</span>
+            <div class="history-right" v-if="item.error_message">
+              <div class="error-message">
+                {{ item.error_message }}
               </div>
             </div>
           </div>
@@ -82,30 +82,83 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, computed } from 'vue';
 import { invoke } from '@tauri-apps/api/core';
 import type { HistoryOpModel } from '@/types';
+import { getCachedHistory, setCachedHistory, setHistoryLoading } from '@/store';
 
 const history = ref<HistoryOpModel[]>([]);
 const isLoading = ref(false);
+const hasCached = ref(false);
 const error = ref('');
 
+// 过滤状态
+const filterOperation = ref('');
+const filterStatus = ref('');
+
 onMounted(() => {
+  // 首先显示缓存数据（如果有的话）
+  const cachedHistory = getCachedHistory();
+  if (cachedHistory.length > 0) {
+    history.value = cachedHistory;
+    hasCached.value = true;
+  }
+
+  // 然后加载新数据
   loadHistory();
 });
 
 async function loadHistory() {
   isLoading.value = true;
+  setHistoryLoading(true);
   error.value = '';
 
   try {
     const result = await invoke<HistoryOpModel[]>('get_all_op_history');
-    history.value = result;
+    console.log('Raw history data:', result);
+    // 按创建时间从新到旧排序
+    const sortedHistory = result.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+    history.value = sortedHistory;
+    console.log('Sorted history data:', history.value);
+    // 更新缓存
+    setCachedHistory(sortedHistory);
   } catch (err) {
+    console.error('Failed to load history:', err);
     error.value = `Failed to load history: ${err}`;
   } finally {
     isLoading.value = false;
+    setHistoryLoading(false);
   }
+}
+
+// 计算属性
+const uniqueOperations = computed(() => {
+  const operations = new Set(history.value.map(item => item.operation).filter(Boolean));
+  return Array.from(operations).sort();
+});
+
+const filteredHistory = computed(() => {
+  let filtered = history.value;
+
+  if (filterOperation.value) {
+    filtered = filtered.filter(item => item.operation === filterOperation.value);
+  }
+
+  if (filterStatus.value) {
+    filtered = filtered.filter(item => item.status === filterStatus.value);
+  }
+
+  return filtered;
+});
+
+const hasActiveFilters = computed(() => {
+  return filterOperation.value !== '' || filterStatus.value !== '';
+});
+
+// 过滤方法
+function clearFilters() {
+  filterOperation.value = '';
+  filterStatus.value = '';
 }
 
 function formatDateTime(dateString: string): string {
@@ -125,6 +178,7 @@ function formatDateTime(dateString: string): string {
   overflow: hidden;
   display: flex;
   flex-direction: column;
+  max-width: 100%;
 }
 
 .list-header {
@@ -134,6 +188,8 @@ function formatDateTime(dateString: string): string {
   margin-bottom: 24px;
   padding-bottom: 16px;
   border-bottom: 2px solid #e9ecef;
+  flex-wrap: wrap;
+  gap: 16px;
 }
 
 .list-title {
@@ -141,6 +197,53 @@ function formatDateTime(dateString: string): string {
   font-weight: 700;
   color: #333;
   margin: 0;
+}
+
+.header-controls {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.filter-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.filter-select {
+  padding: 8px 12px;
+  border: 1px solid #ced4da;
+  border-radius: 6px;
+  background-color: white;
+  color: #495057;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: border-color 0.2s ease;
+  min-width: 140px;
+}
+
+.filter-select:focus {
+  outline: none;
+  border-color: #007bff;
+  box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+}
+
+.clear-filter-btn {
+  padding: 8px 16px;
+  background-color: #6c757d;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: background-color 0.2s ease;
+}
+
+.clear-filter-btn:hover {
+  background-color: #5a6268;
 }
 
 .refresh-btn {
@@ -163,7 +266,9 @@ function formatDateTime(dateString: string): string {
   cursor: not-allowed;
 }
 
-.loading-state, .error-state, .empty-state {
+.loading-state,
+.error-state,
+.empty-state {
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -182,16 +287,23 @@ function formatDateTime(dateString: string): string {
 }
 
 @keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
+  0% {
+    transform: rotate(0deg);
+  }
+
+  100% {
+    transform: rotate(360deg);
+  }
 }
 
-.error-icon, .empty-icon {
+.error-icon,
+.empty-icon {
   font-size: 4rem;
   opacity: 0.6;
 }
 
-.error-text, .empty-text {
+.error-text,
+.empty-text {
   font-size: 1.2rem;
   color: #666;
   margin: 0;
@@ -220,25 +332,52 @@ function formatDateTime(dateString: string): string {
 .history-container {
   flex: 1;
   overflow: hidden;
+  max-width: 100%;
+}
+
+.history-stats {
+  margin-bottom: 16px;
+  padding: 8px 12px;
+  background-color: #f8f9fa;
+  border-radius: 6px;
+  border-left: 4px solid #007bff;
+}
+
+.stats-text {
+  color: #495057;
+  font-size: 0.9rem;
+  font-weight: 500;
 }
 
 .history-list {
   height: 100%;
   overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(400px, 600px));
+  gap: 16px;
+  padding: 4px;
+  max-width: 100%;
+  justify-content: center;
+}
+
+/* 响应式网格 - 基于容器宽度动态显示列数 */
+@media (max-width: 768px) {
+  .history-list {
+    grid-template-columns: 1fr;
+    justify-content: stretch;
+  }
 }
 
 .history-item {
-  display: flex;
-  align-items: center;
   background: white;
   border: 1px solid #e9ecef;
-  border-radius: 12px;
-  padding: 16px;
-  gap: 16px;
+  border-radius: 8px;
+  margin-bottom: 12px;
   transition: all 0.2s ease;
+  padding: 16px;
+  width: 100%;
+  height: auto;
+  max-width: 600px;
 }
 
 .history-item:hover {
@@ -248,89 +387,180 @@ function formatDateTime(dateString: string): string {
 
 .history-item.success {
   border-left: 4px solid #28a745;
+  background-color: #f8fff9;
 }
 
 .history-item.failed {
   border-left: 4px solid #dc3545;
+  background-color: #fffafa;
 }
 
-.history-icon {
-  width: 48px;
-  height: 48px;
-  border-radius: 50%;
-  background-color: #f8f9fa;
+.history-content {
   display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 1.5rem;
-  flex-shrink: 0;
+  gap: 16px;
+  align-items: flex-start;
 }
 
-.history-info {
-  flex: 1;
+.history-left {
+  flex: 0 0 33%; /* left column ~1/3 */
   min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
 }
 
-.history-header {
+.operation-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 12px;
+  gap: 12px;
+  margin-bottom: 8px;
 }
 
-.history-operation {
-  font-size: 1.2rem;
+.operation-name {
+  font-size: 1.1rem;
   font-weight: 600;
   color: #333;
-  margin: 0;
+  word-break: break-word;
+  flex: 1;
 }
 
-.history-badges {
-  display: flex;
-  gap: 8px;
+.operation-status {
+  display: inline-block;
+  font-size: 0.9rem;
+  font-weight: 500;
+  padding: 4px 8px;
+  border-radius: 12px;
+  text-align: center;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
-.status-badge {
-  padding: 4px 12px;
-  border-radius: 20px;
-  font-size: 0.8rem;
-  font-weight: 600;
-  text-transform: uppercase;
-}
-
-.status-badge.success {
+.operation-status.success {
   background-color: #d4edda;
   color: #155724;
 }
 
-.status-badge.failed {
+.operation-status.failed {
   background-color: #f8d7da;
   color: #721c24;
 }
 
-.history-meta {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
-}
-
-.meta-item {
+.history-info {
   display: flex;
-  align-items: center;
+  flex-direction: column;
   gap: 8px;
+}
+
+.recorder-id {
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
   font-size: 0.9rem;
+  color: #495057;
+  background-color: #f8f9fa;
+  padding: 4px 8px;
+  border-radius: 4px;
+  word-break: break-all;
 }
 
-.meta-label {
-  font-weight: 600;
-  color: #666;
-  min-width: 80px;
+.operation-timestamp {
+  font-size: 0.85rem;
+  color: #6c757d;
 }
 
-.meta-value {
-  color: #333;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+.history-right {
+  flex: 1 1 auto; /* right column grows */
+  min-width: 0;
+  max-width: 67%;
+}
+
+.error-message {
+  background-color: #f8d7da;
+  color: #721c24;
+  padding: 12px;
+  border-radius: 4px;
+  font-size: 0.9rem;
+  border-left: 3px solid #dc3545;
+  word-break: break-word;
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+
+/* ensure badges don't color the whole card */
+.history-item.success {
+  border-left: 4px solid #28a745;
+  background-color: #fff; /* keep card white, badge colors handled on .operation-status */
+}
+
+.history-item.failed {
+  border-left: 4px solid #dc3545;
+  background-color: #fff;
+}
+
+.operation-status.success {
+  background-color: #d4edda;
+  color: #155724;
+}
+
+.operation-status.failed {
+  background-color: #f8d7da;
+  color: #721c24;
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+  .history-list {
+    grid-template-columns: 1fr !important;
+    justify-content: stretch !important;
+  }
+
+  .history-item {
+    width: 100%;
+    max-width: none;
+  }
+
+  .history-content {
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .history-right {
+    max-width: none;
+    min-width: auto;
+  }
+
+  .operation-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .operation-status {
+    align-self: flex-start;
+  }
+
+  .list-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .header-controls {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .filter-controls {
+    flex-direction: column;
+  }
+
+  .filter-select {
+    min-width: auto;
+  }
+}
+
+/* 平板设备 */
+@media (min-width: 769px) and (max-width: 1024px) {
+  .history-list {
+    grid-template-columns: repeat(auto-fill, minmax(350px, 500px));
+  }
 }
 </style>

@@ -43,6 +43,8 @@ pub struct DownLink {
 /// 操作类型枚举
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum OperationType {
+    CrawlRecord,
+    CrawlPage,
     Create,
     Update,
     Delete,
@@ -51,6 +53,8 @@ pub enum OperationType {
 impl std::fmt::Display for OperationType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
+            Self::CrawlRecord => write!(f, "CRAWL_RECORD"),
+            Self::CrawlPage => write!(f, "CRAWL_PAGE"),
             Self::Create => write!(f, "CREATE"),
             Self::Update => write!(f, "UPDATE"),
             Self::Delete => write!(f, "DELETE"),

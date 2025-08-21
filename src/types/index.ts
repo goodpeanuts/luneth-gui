@@ -32,11 +32,13 @@ export interface MagnetLink {
 }
 
 export interface HistoryOpModel {
-  id: string;
+  id: number;
+  recorder_id: string;
   operation: string;
   timestamp: string;
   status: string;
   user: string;
+  error_message?: string;
   created_at: string;
   updated_at: string;
 }

@@ -1,5 +1,19 @@
 import { reactive } from 'vue';
-import type { AppState, ViewType, ScrapTaskState, ProgressState, ProgressItem, ProgressStatus } from '@/types';
+import type { AppState, ViewType, ScrapTaskState, ProgressState, ProgressItem, ProgressStatus, RecordModel, HistoryOpModel } from '@/types';
+
+// 缓存状态接口
+export interface CacheState {
+  records: {
+    data: RecordModel[];
+    timestamp: number;
+    isLoading: boolean;
+  };
+  history: {
+    data: HistoryOpModel[];
+    timestamp: number;
+    isLoading: boolean;
+  };
+}
 
 // 全局应用状态
 export const appState = reactive<AppState>({
@@ -8,6 +22,20 @@ export const appState = reactive<AppState>({
   isTaskBaseUrlSet: false,
   isProcessing: false,
   selectedRecord: null,
+});
+
+// 全局缓存状态
+export const cacheState = reactive<CacheState>({
+  records: {
+    data: [],
+    timestamp: 0,
+    isLoading: false,
+  },
+  history: {
+    data: [],
+    timestamp: 0,
+    isLoading: false,
+  },
 });
 
 // 爬取任务状态
@@ -84,4 +112,43 @@ export function updateProgressStatus(progress: ProgressItem) {
   } else {
     progress.status = 'success';
   }
+}
+
+// 缓存管理函数
+const CACHE_EXPIRE_TIME = 5 * 60 * 1000; // 5分钟缓存过期时间
+
+export function isCacheValid(timestamp: number): boolean {
+  return Date.now() - timestamp < CACHE_EXPIRE_TIME;
+}
+
+export function setCachedRecords(records: RecordModel[]) {
+  cacheState.records.data = records;
+  cacheState.records.timestamp = Date.now();
+}
+
+export function getCachedRecords(): RecordModel[] {
+  if (isCacheValid(cacheState.records.timestamp)) {
+    return cacheState.records.data;
+  }
+  return [];
+}
+
+export function setCachedHistory(history: HistoryOpModel[]) {
+  cacheState.history.data = history;
+  cacheState.history.timestamp = Date.now();
+}
+
+export function getCachedHistory(): HistoryOpModel[] {
+  if (isCacheValid(cacheState.history.timestamp)) {
+    return cacheState.history.data;
+  }
+  return [];
+}
+
+export function setRecordsLoading(isLoading: boolean) {
+  cacheState.records.isLoading = isLoading;
+}
+
+export function setHistoryLoading(isLoading: boolean) {
+  cacheState.history.isLoading = isLoading;
 }

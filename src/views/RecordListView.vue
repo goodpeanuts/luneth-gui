@@ -8,7 +8,7 @@
       </button>
     </div>
 
-    <div v-if="isLoading" class="loading-state">
+    <div v-if="isLoading && hasCached == false" class="loading-state">
       <div class="loading-spinner"></div>
       <p>Loading records...</p>
     </div>
@@ -53,8 +53,21 @@
             <div class="record-header">
               <h3 class="record-title">{{ record.title || 'Untitled' }}</h3>
               <div class="record-badges">
-                <span v-if="record.is_liked" class="badge liked">❤️</span>
-                <span v-if="record.is_submitted" class="badge submitted">✅</span>
+                <div class="status-indicators">
+                  <!-- 喜欢状态 -->
+                  <div class="status-icon liked" :class="{ active: record.is_liked }">
+                    <svg width="20" height="20" viewBox="0 0 24 24" :fill="record.is_liked ? '#dc3545' : 'none'" stroke="#dc3545" stroke-width="2">
+                      <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
+                    </svg>
+                  </div>
+                  <!-- 提交状态 -->
+                  <div class="status-icon submitted" :class="{ active: record.is_submitted }">
+                    <svg width="20" height="20" viewBox="0 0 24 24" :fill="record.is_submitted ? '#007bff' : 'none'" stroke="#007bff" stroke-width="2">
+                      <path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"></path>
+                      <path v-if="record.is_submitted" d="m9 12 2 2 4-4"></path>
+                    </svg>
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -87,27 +100,42 @@
 import { ref, onMounted } from 'vue';
 import { invoke } from '@tauri-apps/api/core';
 import type { RecordModel } from '@/types';
-import { navigateTo, appState } from '@/store';
+import { navigateTo, appState, getCachedRecords, setCachedRecords, setRecordsLoading } from '@/store';
 
 const records = ref<RecordModel[]>([]);
 const isLoading = ref(false);
+const hasCached = ref(false);
 const error = ref('');
 
 onMounted(() => {
+  // 首先显示缓存数据（如果有的话）
+  const cachedRecords = getCachedRecords();
+  if (cachedRecords.length > 0) {
+    hasCached.value = true;
+    records.value = cachedRecords;
+  }
+
+  // 然后加载新数据
   loadRecords();
 });
 
 async function loadRecords() {
   isLoading.value = true;
+  setRecordsLoading(true);
   error.value = '';
 
   try {
     const result = await invoke<RecordModel[]>('get_all_records');
-    records.value = result;
+    // 按创建时间从新到旧排序
+    const sortedRecords = result.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+    records.value = sortedRecords;
+    // 更新缓存
+    setCachedRecords(sortedRecords);
   } catch (err) {
     error.value = `Failed to load records: ${err}`;
   } finally {
     isLoading.value = false;
+    setRecordsLoading(false);
   }
 }
 
@@ -238,9 +266,16 @@ function handleImageError(event: Event) {
 .records-list {
   height: 100%;
   overflow-y: auto;
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
   gap: 16px;
+  padding: 4px; /* 为阴影留出空间 */
+}
+
+@media (max-width: 768px) {
+  .records-list {
+    grid-template-columns: 1fr;
+  }
 }
 
 .record-item {
@@ -253,6 +288,8 @@ function handleImageError(event: Event) {
   cursor: pointer;
   transition: all 0.2s ease;
   gap: 16px;
+  max-width: 100%;
+  min-height: 120px;
 }
 
 .record-item:hover {
@@ -312,6 +349,42 @@ function handleImageError(event: Event) {
 .record-badges {
   display: flex;
   gap: 8px;
+  align-items: center;
+}
+
+.status-indicators {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.status-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background-color: #f8f9fa;
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+
+.status-icon:hover {
+  background-color: #e9ecef;
+  transform: scale(1.1);
+}
+
+.status-icon.liked.active {
+  background-color: #ffe6e6;
+}
+
+.status-icon.submitted.active {
+  background-color: #e6f3ff;
+}
+
+.status-icon svg {
+  transition: all 0.2s ease;
 }
 
 .badge {

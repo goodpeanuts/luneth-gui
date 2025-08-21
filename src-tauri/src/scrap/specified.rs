@@ -6,7 +6,7 @@ use tauri::AppHandle;
 use super::events::{
     report_crawl_code_result, report_crawl_codes_finished, report_crawl_manual_start, CrawlStatus,
 };
-use crate::db::{log_failed_crawl_op, log_success_crawl_op};
+use crate::db::{log_failed_crawl_record_op, log_success_crawl_record_op};
 use crate::scrap::AppError;
 use luneth_db::entities::record_local::Model as RecorderModel;
 use luneth_db::DbService;
@@ -39,7 +39,7 @@ where
                 match insert_result {
                     Ok(_) => {
                         // crawl_code_report
-                        log_success_crawl_op(db, code).await?;
+                        log_success_crawl_record_op(db, code).await?;
                         success_count += 1;
                         log::info!("Successfully crawled and saved code: {code}");
 
@@ -54,7 +54,7 @@ where
                     Err(e) => {
                         // crawl_code_report
                         log::error!("Failed to insert record for code {code}: {e}");
-                        log_failed_crawl_op(db, code, e.to_string()).await?;
+                        log_failed_crawl_record_op(db, code, e.to_string()).await?;
                         error_count += 1;
 
                         // Send progress event to frontend
@@ -70,7 +70,7 @@ where
             Err(e) => {
                 // crawl_code_report
                 log::warn!("Failed to crawl code {code}: {e}");
-                log_failed_crawl_op(db, code, e.to_string()).await?;
+                log_failed_crawl_record_op(db, code, e.to_string()).await?;
                 error_count += 1;
 
                 // Send progress event to frontend

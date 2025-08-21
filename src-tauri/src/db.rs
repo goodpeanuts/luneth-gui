@@ -32,11 +32,31 @@ pub(crate) async fn get_op_history(db: &impl DbService) -> Result<Vec<history_op
     Ok(history)
 }
 
-pub(crate) async fn log_success_crawl_op(db: &impl DbService, code: &str) -> Result<(), AppError> {
+pub(crate) async fn log_success_crawl_record_op(
+    db: &impl DbService,
+    code: &str,
+) -> Result<(), AppError> {
     log::debug!("Logging successful crawl operation for code: {code}");
     let op_history_entry = history_op::Model::new_record(
-        code.to_owned(),          // String
-        OperationType::Create,    // OperationType
+        code.to_owned(),            // String
+        OperationType::CrawlRecord, // OperationType
+        OperationStatus::Success,   // OperationStatus
+        "crawl".to_owned(),         // String
+        None,                       // Option<String> 错误信息
+    );
+
+    db.insert_entity(op_history_entry).await?;
+    Ok(())
+}
+
+pub(crate) async fn log_success_crawl_page_op(
+    db: &impl DbService,
+    page: &str,
+) -> Result<(), AppError> {
+    log::debug!("Logging successful crawl operation for page: {page}");
+    let op_history_entry = history_op::Model::new_record(
+        page.to_owned(),          // String
+        OperationType::CrawlPage, // OperationType
         OperationStatus::Success, // OperationStatus
         "crawl".to_owned(),       // String
         None,                     // Option<String> 错误信息
@@ -46,18 +66,36 @@ pub(crate) async fn log_success_crawl_op(db: &impl DbService, code: &str) -> Res
     Ok(())
 }
 
-pub(crate) async fn log_failed_crawl_op(
+pub(crate) async fn log_failed_crawl_record_op(
     db: &impl DbService,
     code: &str,
     err: String,
 ) -> Result<(), AppError> {
     log::debug!("Logging failed crawl operation for code: {code} with error: {err}");
     let op_history_entry = history_op::Model::new_record(
-        code.to_owned(),         // String
-        OperationType::Create,   // OperationType
-        OperationStatus::Failed, // OperationStatus
-        "crawl".to_owned(),      // String
-        Some(err),               // Option<String> 错误信息
+        code.to_owned(),            // String
+        OperationType::CrawlRecord, // OperationType
+        OperationStatus::Failed,    // OperationStatus
+        "crawl".to_owned(),         // String
+        Some(err),                  // Option<String> 错误信息
+    );
+
+    db.insert_entity(op_history_entry).await?;
+    Ok(())
+}
+
+pub(crate) async fn log_failed_crawl_page_op(
+    db: &impl DbService,
+    page: &str,
+    err: String,
+) -> Result<(), AppError> {
+    log::debug!("Logging failed crawl operation for code: {page} with error: {err}");
+    let op_history_entry = history_op::Model::new_record(
+        page.to_owned(),          // String
+        OperationType::CrawlPage, // OperationType
+        OperationStatus::Failed,  // OperationStatus
+        "crawl".to_owned(),       // String
+        Some(err),                // Option<String> 错误信息
     );
 
     db.insert_entity(op_history_entry).await?;
