@@ -18,7 +18,7 @@
           </button>
         </div>
         <button class="refresh-btn" @click="loadHistory" :disabled="isLoading">
-          <span v-if="isLoading && hasCached == false">Loading...</span>
+          <span v-if="isLoading && !hasCached">Loading...</span>
           <span v-else>🔄 Refresh</span>
         </button>
       </div>
