@@ -181,8 +181,10 @@ body {
 
 .main-content {
   flex: 1;
-  overflow: hidden;
+  overflow-y: auto;
   background-color: #ffffff;
+  height: 100vh;
+  scroll-behavior: smooth; /* 添加平滑滚动 */
 }
 
 /* Scrollbar styling */

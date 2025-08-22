@@ -6,9 +6,14 @@ use luneth_db::entities::record_local::Model as RecorderModel;
 use tauri::State;
 use url::Url;
 
-use crate::db::{get_op_history, get_records};
+use crate::client::CLIENT_AUTH;
+use crate::db::{get_op_history, get_records, save_remote_records};
 use crate::scrap::{Task, TASK_BASE_URL};
 use crate::AppState;
+
+// ############
+// # scraping
+// #############
 
 #[tauri::command(rename_all = "snake_case")]
 pub async fn set_task_base_url(mut url: String) -> Result<(), String> {
@@ -117,4 +122,46 @@ pub async fn launch_manual_scrap_task(
             Err(e)
         }
     }
+}
+
+// ############
+// # client
+// #############
+
+#[tauri::command(rename_all = "snake_case")]
+pub async fn set_client_auth(mut url: String, id: String, secret: String) -> Result<(), String> {
+    // Ensure the URL ends with /
+    if url.is_empty() {
+        log::info!("Task base URL reset");
+    } else if !url.ends_with('/') {
+        url.push('/');
+    }
+    Url::parse(&url).map_err(|e| format!("Invalid URL: {e}"))?;
+
+    let client_auth = crate::client::ClientAuth { url, id, secret };
+    *CLIENT_AUTH.lock().await = Some(client_auth);
+    Ok(())
+}
+
+#[tauri::command(rename_all = "snake_case")]
+pub async fn clear_client_auth() -> Result<(), String> {
+    *CLIENT_AUTH.lock().await = None;
+    Ok(())
+}
+
+#[tauri::command(rename_all = "snake_case")]
+pub async fn pull_record_slim(state: State<'_, Arc<AppState>>) -> Result<(usize, usize), String> {
+    log::debug!("Pulling record slim data from remote server");
+    let records = crate::client::pull_record_slim()
+        .await
+        .map_err(|e| e.to_string())?;
+
+    let len = records.len();
+    let db = Arc::clone(&state.db);
+
+    let success_cnt = save_remote_records(db.as_ref(), records)
+        .await
+        .map_err(|e| e.to_string())?;
+    log::info!("Successfully pulled {len} records from remote server",);
+    Ok((len, success_cnt))
 }

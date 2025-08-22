@@ -22,6 +22,17 @@ export const appState = reactive<AppState>({
   isTaskBaseUrlSet: false,
   isProcessing: false,
   selectedRecord: null,
+  clientAuth: {
+    isSet: false,
+    url: '',
+  },
+  pullRecordsState: {
+    isLoading: false,
+    lastSuccessTime: null,
+    lastTotalCount: null,
+    lastNewCount: null,
+    lastError: null,
+  },
 });
 
 // 全局缓存状态
@@ -65,6 +76,46 @@ export function setTaskBaseUrl(url: string) {
 // 检查是否设置了任务基础URL
 export function checkTaskBaseUrl(): boolean {
   return appState.isTaskBaseUrlSet && !!appState.taskBaseUrl;
+}
+
+// 设置客户端认证
+export function setClientAuth(url: string) {
+  appState.clientAuth.isSet = true;
+  appState.clientAuth.url = url;
+}
+
+// 清除客户端认证
+export function clearClientAuth() {
+  appState.clientAuth.isSet = false;
+  appState.clientAuth.url = '';
+}
+
+// 检查是否设置了客户端认证
+export function checkClientAuth(): boolean {
+  return appState.clientAuth.isSet && !!appState.clientAuth.url;
+}
+
+// 设置拉取记录状态
+export function setPullRecordsLoading(isLoading: boolean) {
+  appState.pullRecordsState.isLoading = isLoading;
+}
+
+// 设置拉取记录成功状态
+export function setPullRecordsSuccess(totalCount: number, newCount: number) {
+  appState.pullRecordsState.lastSuccessTime = new Date().toLocaleString();
+  appState.pullRecordsState.lastTotalCount = totalCount;
+  appState.pullRecordsState.lastNewCount = newCount;
+  appState.pullRecordsState.lastError = null;
+  appState.pullRecordsState.isLoading = false;
+}
+
+// 设置拉取记录失败状态
+export function setPullRecordsError(error: string) {
+  appState.pullRecordsState.lastError = error;
+  appState.pullRecordsState.lastSuccessTime = new Date().toLocaleString();
+  appState.pullRecordsState.lastTotalCount = null;
+  appState.pullRecordsState.lastNewCount = null;
+  appState.pullRecordsState.isLoading = false;
 }
 
 // 重置爬取任务状态

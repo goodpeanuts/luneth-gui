@@ -43,6 +43,21 @@ export interface HistoryOpModel {
   updated_at: string;
 }
 
+// 客户端认证状态
+export interface ClientAuthState {
+  isSet: boolean;
+  url: string;
+}
+
+// 拉取记录状态
+export interface PullRecordsState {
+  isLoading: boolean;
+  lastSuccessTime: string | null;
+  lastTotalCount: number | null;
+  lastNewCount: number | null;
+  lastError: string | null;
+}
+
 // 应用状态类型
 export interface AppState {
   currentView: ViewType;
@@ -50,6 +65,8 @@ export interface AppState {
   isTaskBaseUrlSet: boolean;
   isProcessing: boolean;
   selectedRecord: RecordModel | null;
+  clientAuth: ClientAuthState;
+  pullRecordsState: PullRecordsState;
 }
 
 export type ViewType = 'home' | 'record_list' | 'history_list' | 'crawl' | 'config' | 'record_detail';

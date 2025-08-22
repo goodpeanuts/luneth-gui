@@ -8,9 +8,6 @@ use serde::{Deserialize, Serialize};
 pub struct Model {
     #[sea_orm(primary_key, auto_increment = false)]
     pub id: String,
-    pub url: String,
-    #[sea_orm(column_type = "Text")]
-    pub html: String,
     pub cover: String,
     pub title: String,
     pub release_date: String,
@@ -29,12 +26,13 @@ pub struct Model {
     pub idols: Json,
     #[sea_orm(column_type = "Json")]
     pub share_magnet_links: Json,
-    #[sea_orm(column_type = "Json")]
-    pub sample_image_links: Json,
     pub local_image_count: i32,
+
+    pub viewed: bool,
     pub is_liked: bool,
     pub is_submitted: bool,
     pub is_cached_locally: bool,
+
     pub created_at: ChronoDateTimeUtc,
     pub updated_at: ChronoDateTimeUtc,
 }
@@ -57,7 +55,6 @@ impl ActiveModelBehavior for ActiveModel {
             genre: Set(Json::Object(serde_json::Map::new())),
             idols: Set(Json::Object(serde_json::Map::new())),
             share_magnet_links: Set(Json::Array(vec![])),
-            sample_image_links: Set(Json::Array(vec![])),
             created_at: Set(chrono::Utc::now()),
             updated_at: Set(chrono::Utc::now()),
             ..ActiveModelTrait::default()
@@ -92,8 +89,6 @@ impl Model {
         let mut active_model = ActiveModel::new();
 
         active_model.id = Set(recorder.id.clone());
-        active_model.url = Set(recorder.url.clone());
-        active_model.html = Set(recorder.html.clone());
         active_model.cover = Set(recorder.cover.clone());
         active_model.title = Set(recorder.title.clone());
         active_model.release_date = Set(recorder.release_date.clone());
@@ -111,8 +106,6 @@ impl Model {
         // 转换数组为 JSON
         active_model.share_magnet_links =
             Set(serde_json::to_value(&recorder.share_magnet_links).unwrap_or_default());
-        active_model.sample_image_links =
-            Set(serde_json::to_value(&recorder.sample_image_links).unwrap_or_default());
 
         active_model
     }

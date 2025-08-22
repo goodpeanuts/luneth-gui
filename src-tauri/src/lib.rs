@@ -1,3 +1,4 @@
+mod client;
 mod db;
 mod extract;
 mod luneth;
@@ -6,12 +7,12 @@ mod scrap;
 use std::sync::Arc;
 
 // Import all items from the extract module, including process_text
+use crate::luneth::{
+    clear_client_auth, get_all_op_history, get_all_records, launch_auto_scrap_task,
+    launch_manual_scrap_task, pull_record_slim, set_client_auth, set_task_base_url,
+};
 use ::luneth::crawl::CrawlError;
 use extract::{export_to_file, process_text, toggle_line_selection};
-use luneth::{
-    get_all_op_history, get_all_records, launch_auto_scrap_task, launch_manual_scrap_task,
-    set_task_base_url,
-};
 use tauri::Manager as _;
 
 #[cfg(debug_assertions)]
@@ -102,7 +103,10 @@ pub fn run() {
             launch_auto_scrap_task,
             launch_manual_scrap_task,
             get_all_op_history,
-            set_task_base_url
+            set_task_base_url,
+            set_client_auth,
+            clear_client_auth,
+            pull_record_slim,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

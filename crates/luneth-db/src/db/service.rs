@@ -13,6 +13,11 @@ pub trait DbService {
         AM: ActiveModelTrait + sea_orm::ActiveModelBehavior + std::marker::Send,
         Model<AM>: IntoActiveModel<AM> + std::marker::Send;
 
+    async fn or_insert_entity<AM>(&self, active_model: AM) -> Result<Model<AM>>
+    where
+        AM: ActiveModelTrait + sea_orm::ActiveModelBehavior + std::marker::Send,
+        Model<AM>: IntoActiveModel<AM> + std::marker::Send;
+
     async fn query_entity<E>(
         &self,
         offset: Option<u64>,

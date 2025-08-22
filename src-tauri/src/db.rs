@@ -15,6 +15,7 @@ pub(crate) async fn get_records(db: &impl DbService) -> Result<Vec<RecorderModel
     log::debug!("Successfully retrieved {} records", records.len());
     Ok(records)
 }
+
 // TODO: Op errortype display
 pub(crate) async fn get_op_history(db: &impl DbService) -> Result<Vec<history_op::Model>, String> {
     log::debug!("Querying operation history from database");
@@ -100,4 +101,32 @@ pub(crate) async fn log_failed_crawl_page_op(
 
     db.insert_entity(op_history_entry).await?;
     Ok(())
+}
+
+// ############
+// # client
+// #############
+pub(crate) async fn save_remote_records(
+    db: &impl DbService,
+    records: Vec<luneth::common::RecordSlimDto>,
+) -> Result<usize, AppError> {
+    log::debug!("Saving {} remote records to local database", records.len());
+    let mut success_cnt: usize = 0;
+    for record in records {
+        let id = record.id.clone();
+        let active_model = luneth_db::entities::record_remote::ActiveModel::from(record);
+        match db.insert_entity(active_model).await {
+            Ok(_) => success_cnt += 1,
+            Err(e) => {
+                if e.to_string().contains("duplicate key") {
+                    log::debug!("Record already exists, skipping: {id}");
+                } else {
+                    log::error!("Failed to save record {id}: {e}");
+                    return Err(e.into());
+                }
+            }
+        }
+    }
+    log::info!("Successfully saved remote records to local database");
+    Ok(success_cnt)
 }
