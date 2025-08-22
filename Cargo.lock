@@ -2779,7 +2779,7 @@ dependencies = [
 
 [[package]]
 name = "luneth-db"
-version = "0.1.0"
+version = "0.1.5"
 dependencies = [
  "chrono",
  "log",
@@ -2794,7 +2794,7 @@ dependencies = [
 
 [[package]]
 name = "luneth-gui"
-version = "0.1.0"
+version = "0.1.5"
 dependencies = [
  "anyhow",
  "env_logger",
