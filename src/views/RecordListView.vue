@@ -8,7 +8,7 @@
       </button>
     </div>
 
-    <div v-if="isLoading && hasCached == false" class="loading-state">
+    <div v-if="isLoading && !hasCached" class="loading-state">
       <div class="loading-spinner"></div>
       <p>Loading records...</p>
     </div>
