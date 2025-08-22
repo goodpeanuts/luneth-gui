@@ -25,4 +25,8 @@ dist-ssr
 
 target/
 xdoc/
+
+
+# dev
+sample/
 *.md
