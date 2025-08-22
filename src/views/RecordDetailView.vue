@@ -31,8 +31,8 @@
           <div class="cover-section">
             <div class="cover-container">
               <img
-                v-if="record.cover"
-                :src="record.cover"
+                v-if="coverImageSrc"
+                :src="coverImageSrc"
                 :alt="record.title"
                 class="cover-image"
                 @error="handleImageError"
@@ -45,11 +45,11 @@
           </div>
 
           <!-- Sample Images -->
-          <div v-if="record.sample_image_links.length > 0" class="samples-section">
+          <div v-if="sampleImageSrcs.length > 0" class="samples-section">
             <h3 class="samples-title">Sample Images</h3>
             <div class="samples-grid">
               <div
-                v-for="(imageUrl, index) in record.sample_image_links"
+                v-for="(imageUrl, index) in sampleImageSrcs"
                 :key="index"
                 class="sample-item"
               >
@@ -103,14 +103,68 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue';
+import { ref, computed, watch } from 'vue';
 import { appState, navigateTo } from '@/store';
 import RecordInfo from '@/components/RecordInfo.vue';
 import RecordLinks from '@/components/RecordLinks.vue';
+import { loadCoverImage, loadImage } from '@/utils/imageLoader';
+import type { ImageLoadResult } from '@/utils/imageLoader';
 
 const activeTab = ref<'info' | 'links'>('info');
 
 const record = computed(() => appState.selectedRecord);
+
+// 图片加载状态
+const coverImageSrc = ref<string>('');
+const sampleImageSrcs = ref<string[]>([]);
+const imageLoading = ref(false);
+
+// 监听记录变化，加载对应的图片
+watch(record, async (newRecord) => {
+  if (!newRecord) {
+    coverImageSrc.value = '';
+    sampleImageSrcs.value = [];
+    return;
+  }
+
+  imageLoading.value = true;
+
+  try {
+    // 加载封面图片
+    if (newRecord.cover) {
+      if (newRecord.is_cached_locally) {
+        const coverResult = await loadCoverImage(newRecord.id, newRecord.cover);
+        coverImageSrc.value = coverResult.src;
+      } else {
+        coverImageSrc.value = newRecord.cover;
+      }
+    }
+
+    // 加载样例图片 - 基于 local_image_count
+    sampleImageSrcs.value = [];
+    if (newRecord.is_cached_locally && newRecord.local_image_count > 1) {
+      // 样例图片从索引 1 开始（0 是封面）
+      const sampleCount = newRecord.local_image_count - 1;
+      const samplePromises = [];
+      
+      for (let i = 1; i <= sampleCount; i++) {
+        samplePromises.push(loadImage(newRecord.id, i, ''));
+      }
+      
+      const sampleResults = await Promise.all(samplePromises);
+      sampleImageSrcs.value = sampleResults
+        .filter((result: ImageLoadResult) => result.src) // 只保留成功加载的图片
+        .map((result: ImageLoadResult) => result.src);
+    }
+  } catch (error) {
+    console.warn('Failed to load images:', error);
+    // 如果加载失败，使用原始 URL
+    coverImageSrc.value = newRecord.cover || '';
+    sampleImageSrcs.value = [];
+  } finally {
+    imageLoading.value = false;
+  }
+}, { immediate: true });
 
 function handleImageError(event: Event) {
   const img = event.target as HTMLImageElement;

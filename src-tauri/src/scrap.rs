@@ -9,6 +9,7 @@ use crate::AppError;
 
 mod auto;
 mod events;
+mod images;
 mod specified;
 
 #[derive(Debug)]
@@ -28,6 +29,7 @@ pub struct Task {
     db: Arc<DbOperator>,
     task_type: TaskType,
     crawler: crawler::WebCrawler,
+    with_image: bool,
 }
 
 impl Task {
@@ -50,6 +52,7 @@ impl Task {
         app_handle: AppHandle,
         db: Arc<DbOperator>,
         start_url: String,
+        with_image: bool,
     ) -> Result<Self, AppError> {
         log::debug!("Creating new auto scraping task for URL: {start_url}");
         let task_type = TaskType::Auto(start_url);
@@ -60,6 +63,7 @@ impl Task {
             task_type,
             crawler,
             app_handle,
+            with_image,
         })
     }
 
@@ -67,6 +71,7 @@ impl Task {
         app_handle: AppHandle,
         db: Arc<DbOperator>,
         codes: Vec<String>,
+        with_image: bool,
     ) -> Result<Self, AppError> {
         log::debug!(
             "Creating new manual scraping task for {} codes",
@@ -80,6 +85,7 @@ impl Task {
             task_type,
             crawler,
             app_handle,
+            with_image,
         })
     }
 
@@ -113,10 +119,24 @@ impl Task {
     }
 
     async fn crawl_manual(&self, codes: &[String]) -> Result<(), AppError> {
-        specified::crawl_codes(&self.app_handle, self.db.as_ref(), &self.crawler, codes).await
+        specified::crawl_codes(
+            &self.app_handle,
+            self.db.as_ref(),
+            &self.crawler,
+            codes,
+            self.with_image,
+        )
+        .await
     }
 
     async fn crawl_auto(&self, url: &str) -> Result<(), AppError> {
-        auto::auto_crawl_page(&self.app_handle, self.db.as_ref(), &self.crawler, url).await
+        auto::auto_crawl_page(
+            &self.app_handle,
+            self.db.as_ref(),
+            &self.crawler,
+            url,
+            self.with_image,
+        )
+        .await
     }
 }

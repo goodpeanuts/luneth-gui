@@ -38,8 +38,8 @@
         >
           <div class="record-thumbnail">
             <img
-              v-if="record.cover"
-              :src="record.cover"
+              v-if="getImageSrc(record)"
+              :src="getImageSrc(record)"
               :alt="record.title"
               class="record-cover"
               @error="handleImageError"
@@ -101,11 +101,15 @@ import { ref, onMounted } from 'vue';
 import { invoke } from '@tauri-apps/api/core';
 import type { RecordModel } from '@/types';
 import { navigateTo, appState, getCachedRecords, setCachedRecords, setRecordsLoading } from '@/store';
+import { loadDisplayImage } from '@/utils/imageLoader';
 
 const records = ref<RecordModel[]>([]);
 const isLoading = ref(false);
 const hasCached = ref(false);
 const error = ref('');
+
+// 存储图片加载结果的映射
+const imageSources = ref<Map<string, string>>(new Map());
 
 onMounted(() => {
   // 首先显示缓存数据（如果有的话）
@@ -131,12 +135,37 @@ async function loadRecords() {
     records.value = sortedRecords;
     // 更新缓存
     setCachedRecords(sortedRecords);
+    
+    // 加载图片
+    await loadRecordImages(sortedRecords);
   } catch (err) {
     error.value = `Failed to load records: ${err}`;
   } finally {
     isLoading.value = false;
     setRecordsLoading(false);
   }
+}
+
+async function loadRecordImages(recordList: RecordModel[]) {
+  for (const record of recordList) {
+    if (record.is_cached_locally && record.cover) {
+      try {
+        const imageResult = await loadDisplayImage(record.id, record.cover);
+        imageSources.value.set(record.id, imageResult.src);
+      } catch (error) {
+        console.warn(`Failed to load image for record ${record.id}:`, error);
+        // 如果加载失败，使用原始封面 URL
+        imageSources.value.set(record.id, record.cover);
+      }
+    } else if (record.cover) {
+      // 如果没有本地缓存，直接使用远程 URL
+      imageSources.value.set(record.id, record.cover);
+    }
+  }
+}
+
+function getImageSrc(record: RecordModel): string {
+  return imageSources.value.get(record.id) || record.cover || '';
 }
 
 function openRecordDetail(record: RecordModel) {

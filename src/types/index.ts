@@ -2,9 +2,6 @@
 
 export interface RecordModel {
   id: string;
-  url: string;
-  html: string;
-  base_url: string;
   cover: string;
   title: string;
   release_date: string;
@@ -16,8 +13,8 @@ export interface RecordModel {
   genre: Record<string, string>;
   idols: Record<string, string>;
   share_magnet_links: MagnetLink[];
-  sample_image_links: string[];
   local_image_count: number;
+  viewed: boolean;
   is_liked: boolean;
   is_submitted: boolean;
   is_cached_locally: boolean;

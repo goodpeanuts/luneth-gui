@@ -16,6 +16,14 @@
         { "path": "$DOWNLOAD/**" },
         { "path": "$DESKTOP/**" }
       ]
-    }
+    },
+    {
+      "identifier": "fs:allow-read-file",
+      "allow": [
+        { "path": "$APPLOCALDATA/**" }
+      ]
+    },
+    "core:path:default",
+    "core:event:default"
   ]
 }

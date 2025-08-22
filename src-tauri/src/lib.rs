@@ -8,8 +8,9 @@ use std::sync::Arc;
 
 // Import all items from the extract module, including process_text
 use crate::luneth::{
-    clear_client_auth, get_all_op_history, get_all_records, launch_auto_scrap_task,
-    launch_manual_scrap_task, pull_record_slim, set_client_auth, set_task_base_url,
+    check_local_image_exists, clear_client_auth, get_all_op_history, get_all_records,
+    get_app_local_data_dir, launch_auto_scrap_task, launch_manual_scrap_task, pull_record_slim,
+    set_client_auth, set_task_base_url,
 };
 use ::luneth::crawl::CrawlError;
 use extract::{export_to_file, process_text, toggle_line_selection};
@@ -29,8 +30,18 @@ pub(crate) struct AppState {
 pub enum AppError {
     #[error("Crawl error: {0}")]
     CrawlError(#[from] CrawlError),
+
     #[error("Database error: {0}")]
     DatabaseError(#[from] luneth_db::DbError),
+
+    #[error("File error: {0}")]
+    ImageError(#[from] std::io::Error),
+
+    #[error("File system error: {0}")]
+    FileSystemError(String),
+
+    #[error("Crawl image error: {0}")]
+    CrawlImageError(String),
 }
 
 impl From<AppError> for String {
@@ -107,6 +118,8 @@ pub fn run() {
             set_client_auth,
             clear_client_auth,
             pull_record_slim,
+            get_app_local_data_dir,
+            check_local_image_exists,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

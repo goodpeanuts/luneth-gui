@@ -1,4 +1,5 @@
 use std::fmt::Debug;
+use std::fs;
 
 use luneth::crawl::WebCrawler;
 use tauri::AppHandle;
@@ -7,7 +8,8 @@ use super::events::{
     report_crawl_code_result, report_crawl_codes_finished, report_crawl_manual_start, CrawlStatus,
 };
 use crate::db::{log_failed_crawl_record_op, log_success_crawl_record_op};
-use crate::scrap::AppError;
+use crate::scrap::images::crawl_image;
+use crate::AppError;
 use luneth_db::entities::record_local::Model as RecorderModel;
 use luneth_db::DbService;
 
@@ -16,6 +18,7 @@ pub async fn crawl_codes<T>(
     db: &impl DbService,
     crawler: &WebCrawler,
     codes: &[T],
+    with_image: bool,
 ) -> Result<(), AppError>
 where
     T: AsRef<str> + Debug,
@@ -33,7 +36,14 @@ where
 
         match crawler.crawl_code(code).await {
             Ok(record) => {
-                let record_model = RecorderModel::from_recorder(&record);
+                let mut image_path_dir = None;
+                let record_model = if with_image {
+                    image_path_dir = crawl_image(app_handle, crawler, &record).await.ok();
+                    RecorderModel::from_recorder_with_image_local(&record)
+                } else {
+                    RecorderModel::from_recorder(&record)
+                };
+
                 let insert_result = db.insert_entity(record_model).await;
 
                 match insert_result {
@@ -53,6 +63,9 @@ where
                     }
                     Err(e) => {
                         // crawl_code_report
+                        if let Some(image_path_dir) = image_path_dir {
+                            fs::remove_dir_all(image_path_dir).map_err(AppError::from)?;
+                        }
                         log::error!("Failed to insert record for code {code}: {e}");
                         log_failed_crawl_record_op(db, code, e.to_string()).await?;
                         error_count += 1;

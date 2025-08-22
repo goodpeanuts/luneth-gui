@@ -2142,6 +2142,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "http-range"
+version = "0.1.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "21dec9db110f5f872ed9699c3ecf50cf16f423502706ba5c72462e28d3157573"
+
+[[package]]
 name = "httparse"
 version = "1.10.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2221,7 +2227,7 @@ dependencies = [
  "js-sys",
  "log",
  "wasm-bindgen",
- "windows-core 0.61.2",
+ "windows-core 0.58.0",
 ]
 
 [[package]]
@@ -2754,7 +2760,7 @@ checksum = "112b39cec0b298b6c1999fee3e31427f74f676e4cb9879ed1a121b43661a4154"
 [[package]]
 name = "luneth"
 version = "0.1.0"
-source = "git+https://github.com/goodpeanuts/luneth.git?branch=main#b457e5dea9789e108e63dedc377263b71217f279"
+source = "git+https://github.com/goodpeanuts/luneth.git?branch=main#1aa3cf47d02015cfaf571c654ab0d62ecb644832"
 dependencies = [
  "chrono",
  "env_logger",
@@ -5645,6 +5651,7 @@ dependencies = [
  "gtk",
  "heck 0.5.0",
  "http",
+ "http-range",
  "jni",
  "libc",
  "log",

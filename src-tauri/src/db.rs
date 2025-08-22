@@ -130,3 +130,14 @@ pub(crate) async fn save_remote_records(
     log::info!("Successfully saved remote records to local database");
     Ok(success_cnt)
 }
+
+// ############
+// # image
+// #############
+// pub(crate) async fn log_image_crawl_op(
+//     db: &impl DbService,
+//     code: &str,
+//     err: String,
+// ) -> Result<usize, AppError> {
+
+// }

@@ -129,16 +129,6 @@
         <h3 class="section-title">Metadata</h3>
         <div class="info-grid">
           <div class="info-item">
-            <span class="info-label">Source URL:</span>
-            <a :href="record.url" target="_blank" class="info-link">
-              {{ truncateUrl(record.url) }}
-            </a>
-          </div>
-          <div class="info-item">
-            <span class="info-label">Base URL:</span>
-            <span class="info-value">{{ record.base_url }}</span>
-          </div>
-          <div class="info-item">
             <span class="info-label">Created:</span>
             <span class="info-value">{{ formatDate(record.created_at) }}</span>
           </div>
@@ -182,11 +172,6 @@ function formatDate(dateString: string): string {
   } catch {
     return 'Invalid date';
   }
-}
-
-function truncateUrl(url: string): string {
-  if (url.length <= 50) return url;
-  return url.substring(0, 47) + '...';
 }
 </script>
 

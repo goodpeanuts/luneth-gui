@@ -44,9 +44,6 @@ impl ActiveModelBehavior for ActiveModel {
     fn new() -> Self {
         Self {
             id: Set(uuid::Uuid::new_v4().to_string()),
-            is_liked: Set(false),
-            is_submitted: Set(false),
-            is_cached_locally: Set(false),
             local_image_count: Set(0),
             director: Set(Json::Object(serde_json::Map::new())),
             studio: Set(Json::Object(serde_json::Map::new())),
@@ -57,6 +54,11 @@ impl ActiveModelBehavior for ActiveModel {
             share_magnet_links: Set(Json::Array(vec![])),
             created_at: Set(chrono::Utc::now()),
             updated_at: Set(chrono::Utc::now()),
+
+            is_liked: Set(false),
+            is_submitted: Set(false),
+            is_cached_locally: Set(false),
+            viewed: Set(false),
             ..ActiveModelTrait::default()
         }
     }
@@ -106,6 +108,34 @@ impl Model {
         // 转换数组为 JSON
         active_model.share_magnet_links =
             Set(serde_json::to_value(&recorder.share_magnet_links).unwrap_or_default());
+
+        active_model
+    }
+
+    pub fn from_recorder_with_image_local(recorder: &Recorder) -> ActiveModel {
+        let mut active_model = ActiveModel::new();
+
+        active_model.id = Set(recorder.id.clone());
+        active_model.cover = Set(recorder.cover.clone());
+        active_model.title = Set(recorder.title.clone());
+        active_model.release_date = Set(recorder.release_date.clone());
+        active_model.length = Set(recorder.length.clone());
+        active_model.local_image_count = Set(recorder.local_image_count);
+
+        // 转换 HashMap 为 JSON
+        active_model.director = Set(serde_json::to_value(&recorder.director).unwrap_or_default());
+        active_model.studio = Set(serde_json::to_value(&recorder.studio).unwrap_or_default());
+        active_model.label = Set(serde_json::to_value(&recorder.label).unwrap_or_default());
+        active_model.series = Set(serde_json::to_value(&recorder.series).unwrap_or_default());
+        active_model.genre = Set(serde_json::to_value(&recorder.genre).unwrap_or_default());
+        active_model.idols = Set(serde_json::to_value(&recorder.idols).unwrap_or_default());
+
+        // 转换数组为 JSON
+        active_model.share_magnet_links =
+            Set(serde_json::to_value(&recorder.share_magnet_links).unwrap_or_default());
+
+        // 标记为本地缓存
+        active_model.is_cached_locally = Set(true);
 
         active_model
     }

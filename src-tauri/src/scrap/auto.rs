@@ -18,6 +18,7 @@ pub async fn auto_crawl_page(
     db: &impl DbService,
     crawler: &WebCrawler,
     start_url: &str,
+    with_image: bool,
 ) -> Result<(), AppError> {
     log::debug!("Starting auto crawl for URL: {start_url}");
 
@@ -65,7 +66,7 @@ pub async fn auto_crawl_page(
             break;
         }
 
-        super::specified::crawl_codes(app_handle, db, crawler, &record_ids).await?;
+        super::specified::crawl_codes(app_handle, db, crawler, &record_ids, with_image).await?;
         // crawl_page_finished(page_i);
         log::info!(
             "Successfully crawled page: {url}, found {} records",
