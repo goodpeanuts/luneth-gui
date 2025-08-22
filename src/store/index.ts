@@ -115,7 +115,7 @@ export function updateProgressStatus(progress: ProgressItem) {
 }
 
 // 缓存管理函数
-const CACHE_EXPIRE_TIME = 5 * 60 * 1000; // 5分钟缓存过期时间
+const CACHE_EXPIRE_TIME = 5 * 60 * 1000; // 5 minutes cache expiration time
 
 export function isCacheValid(timestamp: number): boolean {
   return Date.now() - timestamp < CACHE_EXPIRE_TIME;
