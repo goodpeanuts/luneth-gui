@@ -203,3 +203,66 @@ export function setRecordsLoading(isLoading: boolean) {
 export function setHistoryLoading(isLoading: boolean) {
   cacheState.history.isLoading = isLoading;
 }
+
+// 记录交互功能
+export async function markRecordViewed(recordId: string): Promise<void> {
+  const { invoke } = await import('@tauri-apps/api/core');
+  try {
+    await invoke('mark_record_viewed', { code: recordId });
+
+    // 更新本地状态
+    updateRecordInCache(recordId, { viewed: true });
+
+    // 如果当前选中的记录是这个，也要更新
+    if (appState.selectedRecord?.id === recordId) {
+      appState.selectedRecord.viewed = true;
+    }
+  } catch (error) {
+    console.error('Failed to mark record as viewed:', error);
+    throw error;
+  }
+}
+
+export async function markRecordLiked(recordId: string): Promise<void> {
+  const { invoke } = await import('@tauri-apps/api/core');
+  try {
+    await invoke('mark_record_liked', { code: recordId });
+
+    // 更新本地状态
+    updateRecordInCache(recordId, { is_liked: true });
+
+    // 如果当前选中的记录是这个，也要更新
+    if (appState.selectedRecord?.id === recordId) {
+      appState.selectedRecord.is_liked = true;
+    }
+  } catch (error) {
+    console.error('Failed to mark record as liked:', error);
+    throw error;
+  }
+}
+
+export async function markRecordUnliked(recordId: string): Promise<void> {
+  const { invoke } = await import('@tauri-apps/api/core');
+  try {
+    await invoke('mark_record_unliked', { code: recordId });
+
+    // 更新本地状态
+    updateRecordInCache(recordId, { is_liked: false });
+
+    // 如果当前选中的记录是这个，也要更新
+    if (appState.selectedRecord?.id === recordId) {
+      appState.selectedRecord.is_liked = false;
+    }
+  } catch (error) {
+    console.error('Failed to mark record as unliked:', error);
+    throw error;
+  }
+}
+
+// 辅助函数：更新缓存中的记录
+function updateRecordInCache(recordId: string, updates: Partial<RecordModel>): void {
+  const record = cacheState.records.data.find(r => r.id === recordId);
+  if (record) {
+    Object.assign(record, updates);
+  }
+}

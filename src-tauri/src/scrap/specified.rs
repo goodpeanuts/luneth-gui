@@ -7,11 +7,11 @@ use tauri::AppHandle;
 use super::events::{
     report_crawl_code_result, report_crawl_codes_finished, report_crawl_manual_start, CrawlStatus,
 };
-use crate::db::{log_failed_crawl_record_op, log_success_crawl_record_op};
+use crate::db::log::{log_failed_op, log_success_op};
 use crate::scrap::images::crawl_record_image;
 use crate::AppError;
 use luneth_db::entities::record_local::Model as RecorderModel;
-use luneth_db::DbService;
+use luneth_db::{DbService, OperationType};
 
 pub async fn crawl_codes<T>(
     app_handle: &AppHandle,
@@ -49,7 +49,8 @@ where
                 match insert_result {
                     Ok(_) => {
                         // crawl_code_report
-                        log_success_crawl_record_op(db, code).await?;
+                        // log_success_crawl_record_op(db, code).await?;
+                        log_success_op(db, OperationType::CrawlRecord, code).await?;
                         success_count += 1;
                         log::info!("Successfully crawled and saved code: {code}");
 
@@ -67,7 +68,7 @@ where
                             fs::remove_dir_all(image_path_dir).map_err(AppError::from)?;
                         }
                         log::error!("Failed to insert record for code {code}: {e}");
-                        log_failed_crawl_record_op(db, code, e.to_string()).await?;
+                        log_failed_op(db, OperationType::CrawlRecord, code, e.to_string()).await?;
                         error_count += 1;
 
                         // Send progress event to frontend
@@ -83,7 +84,7 @@ where
             Err(e) => {
                 // crawl_code_report
                 log::warn!("Failed to crawl code {code}: {e}");
-                log_failed_crawl_record_op(db, code, e.to_string()).await?;
+                log_failed_op(db, OperationType::CrawlRecord, code, e.to_string()).await?;
                 error_count += 1;
 
                 // Send progress event to frontend

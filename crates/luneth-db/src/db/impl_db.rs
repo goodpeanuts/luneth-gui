@@ -110,7 +110,7 @@ impl super::service::DbService for super::DbOperator {
     /// 根据ID查询单个记录
     async fn find_record_local_by_id<E>(&self, id: &str) -> Result<Option<E::Model>>
     where
-        E: EntityTrait + Into<<E::PrimaryKey as PrimaryKeyTrait>::ValueType>,
+        E: EntityTrait,
         <<E as EntityTrait>::PrimaryKey as PrimaryKeyTrait>::ValueType: for<'a> From<&'a str>,
     {
         let result = E::find_by_id(id).one(&self.db).await?;

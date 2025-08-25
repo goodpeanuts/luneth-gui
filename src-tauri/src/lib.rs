@@ -1,5 +1,9 @@
 mod client;
-mod db;
+mod db {
+    pub mod log;
+    pub mod read;
+    pub mod write;
+}
 mod extract;
 mod scrap;
 mod utils;
@@ -7,12 +11,12 @@ mod command {
     pub mod client;
     pub mod extract;
     pub mod image;
+    pub mod interaction;
     pub mod scrap;
 }
 
-use std::sync::Arc;
-
 use ::luneth::crawl::CrawlError;
+use std::sync::Arc;
 use tauri::Manager as _;
 
 #[cfg(debug_assertions)]
@@ -25,6 +29,7 @@ use crate::command::{
     client::{clear_client_auth, pull_record_slim, set_client_auth},
     extract::{export_to_file, process_text, toggle_line_selection},
     image::{get_app_local_data_dir, read_local_record_image},
+    interaction::{mark_record_liked, mark_record_unliked, mark_record_viewed},
     scrap::{
         get_all_op_history, get_all_records, launch_auto_scrap_task, launch_manual_scrap_task,
         set_task_base_url,
@@ -129,6 +134,9 @@ pub fn run() {
             pull_record_slim,
             get_app_local_data_dir,
             read_local_record_image,
+            mark_record_viewed,
+            mark_record_liked,
+            mark_record_unliked,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

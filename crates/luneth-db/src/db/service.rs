@@ -47,6 +47,6 @@ pub trait DbService {
 
     async fn find_record_local_by_id<E>(&self, id: &str) -> Result<Option<E::Model>>
     where
-        E: EntityTrait + Into<<E::PrimaryKey as PrimaryKeyTrait>::ValueType>,
+        E: EntityTrait,
         <<E as EntityTrait>::PrimaryKey as PrimaryKeyTrait>::ValueType: for<'a> From<&'a str>;
 }

@@ -6,7 +6,7 @@ use luneth_db::entities::record_local::Model as RecorderModel;
 use tauri::State;
 use url::Url;
 
-use crate::db::{get_op_history, get_records};
+use crate::db::read::{get_op_history, get_records};
 use crate::scrap::{Task, TASK_BASE_URL};
 use crate::AppState;
 

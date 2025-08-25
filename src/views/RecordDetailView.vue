@@ -15,7 +15,11 @@
           ← Back to Records
         </button>
         <div class="record-actions">
-          <button class="action-btn like" :class="{ active: record.is_liked }">
+          <button
+            class="action-btn like"
+            :class="{ active: record.is_liked }"
+            @click="toggleLike"
+          >
             {{ record.is_liked ? '❤️ Liked' : '🤍 Like' }}
           </button>
           <button class="action-btn submit" :class="{ active: record.is_submitted }">
@@ -82,7 +86,7 @@
 
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue';
-import { appState, navigateTo } from '@/store';
+import { appState, navigateTo, markRecordViewed, markRecordLiked, markRecordUnliked } from '@/store';
 import RecordInfo from '@/components/RecordInfo.vue';
 import RecordLinks from '@/components/RecordLinks.vue';
 import { loadSampleImages } from '@/utils/imageLoader';
@@ -97,12 +101,21 @@ const coverImageSrc = ref<string>('');
 const sampleImageSrcs = ref<string[]>([]);
 const imageLoading = ref(false);
 
-// 监听记录变化，加载对应的图片
+// 监听记录变化，加载对应的图片并标记为已查看
 watch(record, async (newRecord) => {
   if (!newRecord) {
     coverImageSrc.value = '';
     sampleImageSrcs.value = [];
     return;
+  }
+
+  // 标记为已查看（如果还未查看）
+  if (!newRecord.viewed) {
+    try {
+      await markRecordViewed(newRecord.id);
+    } catch (error) {
+      console.warn('Failed to mark record as viewed:', error);
+    }
   }
 
   imageLoading.value = true;
@@ -137,6 +150,22 @@ watch(record, async (newRecord) => {
     imageLoading.value = false;
   }
 }, { immediate: true });
+
+// 切换喜欢状态
+async function toggleLike() {
+  if (!record.value) return;
+
+  try {
+    if (record.value.is_liked) {
+      await markRecordUnliked(record.value.id);
+    } else {
+      await markRecordLiked(record.value.id);
+    }
+  } catch (error) {
+    console.error('Failed to toggle like status:', error);
+    // 可以在这里添加错误提示
+  }
+}
 
 function handleImageError(event: Event) {
   const img = event.target as HTMLImageElement;

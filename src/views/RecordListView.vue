@@ -34,6 +34,7 @@
           v-for="record in records"
           :key="record.id"
           class="record-item"
+          :class="{ 'unviewed': !record.viewed }"
           @click="openRecordDetail(record)"
         >
           <div class="record-thumbnail">
@@ -55,7 +56,11 @@
               <div class="record-badges">
                 <div class="status-indicators">
                   <!-- 喜欢状态 -->
-                  <div class="status-icon liked" :class="{ active: record.is_liked }">
+                  <div
+                    class="status-icon liked"
+                    :class="{ active: record.is_liked }"
+                    @click.stop="toggleRecordLike(record)"
+                  >
                     <svg width="20" height="20" viewBox="0 0 24 24" :fill="record.is_liked ? '#dc3545' : 'none'" stroke="#dc3545" stroke-width="2">
                       <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
                     </svg>
@@ -100,7 +105,7 @@
 import { ref, onMounted } from 'vue';
 import { invoke } from '@tauri-apps/api/core';
 import type { RecordModel } from '@/types';
-import { navigateTo, appState, getCachedRecords, setCachedRecords, setRecordsLoading } from '@/store';
+import { navigateTo, appState, getCachedRecords, setCachedRecords, setRecordsLoading, markRecordLiked, markRecordUnliked } from '@/store';
 import { loadCoverImage } from '@/utils/imageLoader';
 
 const records = ref<RecordModel[]>([]);
@@ -179,6 +184,20 @@ function formatDate(dateString: string): string {
     return new Date(dateString).toLocaleDateString();
   } catch {
     return 'Invalid date';
+  }
+}
+
+// 切换喜欢状态
+async function toggleRecordLike(record: RecordModel) {
+  try {
+    if (record.is_liked) {
+      await markRecordUnliked(record.id);
+    } else {
+      await markRecordLiked(record.id);
+    }
+  } catch (error) {
+    console.error('Failed to toggle like status:', error);
+    // 可以在这里添加错误提示
   }
 }
 
@@ -321,10 +340,19 @@ function handleImageError(event: Event) {
   min-height: 120px;
 }
 
+.record-item.unviewed {
+  background: #f0f8ff; /* 淡蓝色背景 */
+  border-color: #b3d9ff;
+}
+
 .record-item:hover {
   transform: translateY(-2px);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
   border-color: #007bff;
+}
+
+.record-item.unviewed:hover {
+  background: #e6f3ff; /* 悬停时稍微深一点的蓝色 */
 }
 
 .record-thumbnail {

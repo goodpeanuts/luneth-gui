@@ -150,4 +150,14 @@ impl Model {
             local_image_count: self.local_image_count,
         }
     }
+
+    pub fn set_viewd(mut self, viewed: bool) -> ActiveModel {
+        self.viewed = viewed;
+        self.into()
+    }
+
+    pub fn set_liked(mut self, liked: bool) -> ActiveModel {
+        self.is_liked = liked;
+        self.into()
+    }
 }

@@ -45,6 +45,10 @@ pub struct DownLink {
 pub enum OperationType {
     CrawlRecord,
     CrawlPage,
+    Viewed,
+    Liked,
+    Unliked,
+    Submit,
     Create,
     Update,
     Delete,
@@ -55,6 +59,10 @@ impl std::fmt::Display for OperationType {
         match self {
             Self::CrawlRecord => write!(f, "CRAWL_RECORD"),
             Self::CrawlPage => write!(f, "CRAWL_PAGE"),
+            Self::Viewed => write!(f, "VIEWED"),
+            Self::Liked => write!(f, "LIKED"),
+            Self::Unliked => write!(f, "UNLIKED"),
+            Self::Submit => write!(f, "SUBMIT"),
             Self::Create => write!(f, "CREATE"),
             Self::Update => write!(f, "UPDATE"),
             Self::Delete => write!(f, "DELETE"),

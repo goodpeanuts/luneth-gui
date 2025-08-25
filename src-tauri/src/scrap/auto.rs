@@ -2,13 +2,13 @@ use luneth::crawl::WebCrawler;
 use tauri::AppHandle;
 
 use crate::{
-    db::{log_failed_crawl_page_op, log_success_crawl_page_op},
+    db::log::{log_failed_op, log_success_op},
     scrap::{
         events::{report_crawl_page_failed, report_crawl_page_start, report_crawl_page_success},
         AppError,
     },
 };
-use luneth_db::DbService;
+use luneth_db::{DbService, OperationType};
 
 // XXX: conditionally stop
 const MAX_ITER_DEPTH: usize = 30;
@@ -36,7 +36,7 @@ pub async fn auto_crawl_page(
                 // crawl_page_success(page_i, len);
                 log::debug!("Successfully crawled page: {url}");
 
-                log_success_crawl_page_op(db, &page_name).await?;
+                log_success_op(db, OperationType::CrawlPage, &page_name).await?;
 
                 // Send page success event to frontend
                 report_crawl_page_success(app_handle, &page_name, record_pieces.len());
@@ -47,7 +47,7 @@ pub async fn auto_crawl_page(
                 // crawl_page_failed(page_i, msg);
                 log::error!("Failed to crawl page {url}: {e}");
 
-                log_failed_crawl_page_op(db, &page_name, e.to_string()).await?;
+                log_failed_op(db, OperationType::CrawlPage, &page_name, e.to_string()).await?;
 
                 // Send page failed event to frontend
                 report_crawl_page_failed(app_handle, &page_name, e.to_string());
