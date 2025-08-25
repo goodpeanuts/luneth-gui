@@ -67,7 +67,7 @@ export interface AppState {
   pullRecordsState: PullRecordsState;
 }
 
-export type ViewType = 'home' | 'record_list' | 'history_list' | 'crawl' | 'config' | 'record_detail';
+export type ViewType = 'home' | 'record_list' | 'history_list' | 'crawl' | 'manage' | 'config' | 'record_detail';
 
 // 爬取任务类型
 export type ScrapTaskType = 'auto' | 'manual';
@@ -97,4 +97,36 @@ export interface ProgressItem {
 export interface ProgressState {
   progressList: ProgressItem[];
   isVisible: boolean;
+}
+
+// 管理任务状态类型
+export type ManageTaskStatus = 'idle' | 'running' | 'success' | 'failed';
+
+// 管理任务进度
+export interface ManageTaskProgress {
+  processed: number;
+  total: number;
+}
+
+// 单个管理任务状态
+export interface ManageTaskState {
+  status: ManageTaskStatus;
+  message?: string;
+  progress?: ManageTaskProgress;
+  startedAt?: string;
+  completedAt?: string;
+}
+
+// 管理任务全局状态
+export interface ManageTasksState {
+  idolCrawl: ManageTaskState;
+  recordPull: ManageTaskState;
+}
+
+// 记录筛选选项
+export interface RecordFilterOptions {
+  isLiked?: boolean | null; // null = all, true = liked only, false = not liked only
+  isViewed?: boolean | null; // null = all, true = viewed only, false = not viewed only
+  isSubmitted?: boolean | null; // null = all, true = submitted only, false = not submitted only
+  hasLocalImages?: boolean | null; // null = all, true = has local images, false = no local images
 }

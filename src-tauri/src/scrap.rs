@@ -8,28 +8,35 @@ use tokio::sync::Mutex;
 use crate::AppError;
 
 mod auto;
-mod events;
+mod idol;
 mod images;
+mod record;
 mod specified;
-
-#[derive(Debug)]
-pub enum TaskType {
-    // Start URL
-    Auto(String),
-
-    Manual(Vec<String>),
-}
 
 pub static TASK_BASE_URL: LazyLock<Mutex<Option<String>>> = LazyLock::new(|| {
     Mutex::new(None) // Default base URL
 });
+
+#[derive(Debug)]
+pub enum TaskType {
+    // Start URL, and with image
+    Auto(String, bool),
+
+    // List of specified codes, and with image
+    Manual(Vec<String>, bool),
+
+    // Pull remote records
+    PullRemote,
+
+    // Idol Link
+    Idol,
+}
 
 pub struct Task {
     app_handle: AppHandle,
     db: Arc<DbOperator>,
     task_type: TaskType,
     crawler: crawler::WebCrawler,
-    with_image: bool,
 }
 
 impl Task {
@@ -48,47 +55,6 @@ impl Task {
         crawler::WebCrawler::with_config(config).map_err(AppError::CrawlError)
     }
 
-    pub async fn new_auto(
-        app_handle: AppHandle,
-        db: Arc<DbOperator>,
-        start_url: String,
-        with_image: bool,
-    ) -> Result<Self, AppError> {
-        log::debug!("Creating new auto scraping task for URL: {start_url}");
-        let task_type = TaskType::Auto(start_url);
-        let crawler = Self::new_crawler().await?;
-        log::debug!("Auto scraping task created successfully");
-        Ok(Self {
-            db,
-            task_type,
-            crawler,
-            app_handle,
-            with_image,
-        })
-    }
-
-    pub async fn new_manual(
-        app_handle: AppHandle,
-        db: Arc<DbOperator>,
-        codes: Vec<String>,
-        with_image: bool,
-    ) -> Result<Self, AppError> {
-        log::debug!(
-            "Creating new manual scraping task for {} codes",
-            codes.len()
-        );
-        let task_type = TaskType::Manual(codes);
-        let crawler = Self::new_crawler().await?;
-        log::debug!("Manual scraping task created successfully");
-        Ok(Self {
-            db,
-            task_type,
-            crawler,
-            app_handle,
-            with_image,
-        })
-    }
-
     #[expect(unused)]
     pub fn get_crawler(&self) -> &crawler::WebCrawler {
         &self.crawler
@@ -97,17 +63,24 @@ impl Task {
     pub async fn exec(mut self) -> Result<(), AppError> {
         log::debug!("Starting task execution");
         log::debug!("Starting web crawler");
-        self.crawler = self.crawler.start().await?;
 
         let result = match &self.task_type {
-            TaskType::Auto(url) => {
+            TaskType::Auto(url, with_image) => {
+                self.crawler = self.crawler.start().await?;
                 log::debug!("Executing auto crawl task for URL: {url}");
-                self.crawl_auto(url).await
+                self.crawl_auto(url, *with_image).await
             }
-            TaskType::Manual(codes) => {
+            TaskType::Manual(codes, with_image) => {
+                self.crawler = self.crawler.start().await?;
                 log::debug!("Executing manual crawl task for {} codes", codes.len());
-                self.crawl_manual(codes).await
+                self.crawl_manual(codes, *with_image).await
             }
+            TaskType::Idol => {
+                self.crawler = self.crawler.start().await?;
+                log::debug!("Executing idol crawl task");
+                self.crawl_idol().await
+            }
+            TaskType::PullRemote => self.pull_record_slim().await,
         };
 
         match &result {
@@ -116,27 +89,5 @@ impl Task {
         }
 
         result
-    }
-
-    async fn crawl_manual(&self, codes: &[String]) -> Result<(), AppError> {
-        specified::crawl_codes(
-            &self.app_handle,
-            self.db.as_ref(),
-            &self.crawler,
-            codes,
-            self.with_image,
-        )
-        .await
-    }
-
-    async fn crawl_auto(&self, url: &str) -> Result<(), AppError> {
-        auto::auto_crawl_page(
-            &self.app_handle,
-            self.db.as_ref(),
-            &self.crawler,
-            url,
-            self.with_image,
-        )
-        .await
     }
 }

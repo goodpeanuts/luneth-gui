@@ -1,19 +1,50 @@
+use std::sync::Arc;
+
 use luneth::crawl::WebCrawler;
-use tauri::AppHandle;
+use serde::Serialize;
+use tauri::{AppHandle, Emitter as _};
 
 use crate::{
     db::log::{log_failed_op, log_success_op},
-    scrap::{
-        events::{report_crawl_page_failed, report_crawl_page_start, report_crawl_page_success},
-        AppError,
-    },
+    scrap::{AppError, TaskType},
 };
-use luneth_db::{DbService, OperationType};
+use luneth_db::{DbOperator, DbService, OperationType};
 
 // XXX: conditionally stop
 const MAX_ITER_DEPTH: usize = 30;
 
-pub async fn auto_crawl_page(
+impl super::Task {
+    pub async fn new_auto(
+        app_handle: AppHandle,
+        db: Arc<DbOperator>,
+        start_url: String,
+        with_image: bool,
+    ) -> Result<Self, AppError> {
+        log::debug!("Creating new auto scraping task for URL: {start_url}");
+        let task_type = TaskType::Auto(start_url, with_image);
+        let crawler = Self::new_crawler().await?;
+        log::debug!("Auto scraping task created successfully");
+        Ok(Self {
+            db,
+            task_type,
+            crawler,
+            app_handle,
+        })
+    }
+
+    pub(super) async fn crawl_auto(&self, url: &str, with_image: bool) -> Result<(), AppError> {
+        auto_crawl_page(
+            &self.app_handle,
+            self.db.as_ref(),
+            &self.crawler,
+            url,
+            with_image,
+        )
+        .await
+    }
+}
+
+async fn auto_crawl_page(
     app_handle: &AppHandle,
     db: &impl DbService,
     crawler: &WebCrawler,
@@ -78,4 +109,63 @@ pub async fn auto_crawl_page(
 
     log::info!("Auto crawl completed for URL: {start_url}");
     Ok(())
+}
+
+// event report
+
+// Progress events for page crawling (auto mode)
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct CrawlPageStartEvent {
+    pub page_name: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct CrawlPageSuccessEvent {
+    pub page_name: String,
+    pub total_count: usize,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct CrawlPageFailedEvent {
+    pub page_name: String,
+    pub error_message: String,
+}
+
+fn report_crawl_page_start(app_handle: &AppHandle, page_name: &str) {
+    let event = CrawlPageStartEvent {
+        page_name: page_name.to_owned(),
+    };
+    match app_handle.emit("crawl-page-start", &event) {
+        Ok(_) => log::debug!("Emitted crawl-page-start event for {page_name}"),
+        Err(e) => log::error!("Failed to emit crawl-page-start event: {e}"),
+    }
+}
+
+fn report_crawl_page_success(app_handle: &AppHandle, page_name: &str, total_count: usize) {
+    let event = CrawlPageSuccessEvent {
+        page_name: page_name.to_owned(),
+        total_count,
+    };
+    match app_handle.emit("crawl-page-success", &event) {
+        Ok(_) => {
+            log::debug!(
+                "Emitted crawl-page-success event for {page_name} with {total_count} items"
+            );
+        }
+        Err(e) => log::error!("Failed to emit crawl-page-success event: {e}"),
+    }
+}
+
+fn report_crawl_page_failed(app_handle: &AppHandle, page_name: &str, error_message: String) {
+    let event = CrawlPageFailedEvent {
+        page_name: page_name.to_owned(),
+        error_message,
+    };
+    match app_handle.emit("crawl-page-failed", &event) {
+        Ok(_) => log::debug!("Emitted crawl-page-failed event for {page_name}"),
+        Err(e) => log::error!("Failed to emit crawl-page-failed event: {e}"),
+    }
 }

@@ -1,5 +1,5 @@
 import { reactive } from 'vue';
-import type { AppState, ViewType, ScrapTaskState, ProgressState, ProgressItem, ProgressStatus, RecordModel, HistoryOpModel } from '@/types';
+import type { AppState, ViewType, ScrapTaskState, ProgressState, ProgressItem, RecordModel, HistoryOpModel, ManageTasksState, ManageTaskStatus, ManageTaskProgress, RecordFilterOptions } from '@/types';
 
 // 缓存状态接口
 export interface CacheState {
@@ -60,6 +60,24 @@ export const scrapTaskState = reactive<ScrapTaskState>({
 export const progressState = reactive<ProgressState>({
   progressList: [],
   isVisible: false,
+});
+
+// 管理任务状态
+export const manageTaskState = reactive<ManageTasksState>({
+  idolCrawl: {
+    status: 'idle',
+  },
+  recordPull: {
+    status: 'idle',
+  },
+});
+
+// 记录筛选状态
+export const recordFilterState = reactive<RecordFilterOptions>({
+  isLiked: null,
+  isViewed: null,
+  isSubmitted: null,
+  hasLocalImages: null,
 });
 
 // 导航方法
@@ -125,9 +143,53 @@ export function resetScrapTaskState() {
   scrapTaskState.inputValue = '';
 }
 
-// 进度管理函数
-export function resetProgress() {
+// Progress item management functions
+export function createProgressItem(name: string, total: number = 0): ProgressItem {
+  const item: ProgressItem = {
+    id: `${name}-${Date.now()}`,
+    name,
+    current: 0,
+    total,
+    status: 'pending',
+    createdAt: Date.now(),
+  };
+  progressState.progressList.push(item);
+  progressState.isVisible = true;
+  return item;
+}
+
+export function updateProgressItem(id: string, updates: Partial<ProgressItem>) {
+  const item = progressState.progressList.find(p => p.id === id);
+  if (item) {
+    Object.assign(item, updates);
+  }
+}
+
+export function clearProgressList() {
   progressState.progressList = [];
+  progressState.isVisible = false;
+}
+
+// Additional progress helper functions
+export function findOrCreateProgress(name: string): ProgressItem {
+  let item = progressState.progressList.find(p => p.name === name);
+  if (!item) {
+    item = createProgressItem(name);
+  }
+  return item;
+}
+
+export function updateProgressStatus(item: ProgressItem) {
+  // This function can be used to update progress status based on current/total
+  if (item.current === item.total && item.total > 0) {
+    item.status = 'success';
+  } else if (item.current > 0) {
+    item.status = 'in-progress';
+  }
+}
+
+export function resetProgress() {
+  clearProgressList();
 }
 
 export function showProgress() {
@@ -138,31 +200,79 @@ export function hideProgress() {
   progressState.isVisible = false;
 }
 
-export function findOrCreateProgress(name: string): ProgressItem {
-  let progress = progressState.progressList.find(p => p.name === name);
-  if (!progress) {
-    progress = {
-      id: `${Date.now()}-${Math.random()}`,
-      name,
-      current: 0,
-      total: -1,
-      status: 'pending' as ProgressStatus,
-      createdAt: Date.now(),
-    };
-    // 新进度条插入到顶部（用于auto模式的正确显示顺序）
-    progressState.progressList.unshift(progress);
+// 管理任务状态管理函数
+export function setManageTaskStatus(taskType: 'idolCrawl' | 'recordPull', status: ManageTaskStatus) {
+  const task = manageTaskState[taskType];
+  task.status = status;
+
+  const now = new Date().toLocaleString();
+  if (status === 'running') {
+    task.startedAt = now;
+    task.completedAt = undefined;
+  } else if (status === 'success' || status === 'failed') {
+    task.completedAt = now;
   }
-  return progress;
 }
 
-export function updateProgressStatus(progress: ProgressItem) {
-  if (progress.current === 0) {
-    progress.status = 'pending';
-  } else if (progress.current < progress.total) {
-    progress.status = 'in-progress';
-  } else {
-    progress.status = 'success';
-  }
+export function setManageTaskMessage(taskType: 'idolCrawl' | 'recordPull', message: string) {
+  manageTaskState[taskType].message = message;
+}
+
+export function setManageTaskProgress(taskType: 'idolCrawl' | 'recordPull', progress: ManageTaskProgress) {
+  manageTaskState[taskType].progress = progress;
+}
+
+export function resetManageTaskState(taskType: 'idolCrawl' | 'recordPull') {
+  manageTaskState[taskType] = {
+    status: 'idle',
+  };
+}
+
+// 记录筛选函数
+export function setRecordFilter(options: Partial<RecordFilterOptions>) {
+  Object.assign(recordFilterState, options);
+}
+
+export function clearRecordFilters() {
+  recordFilterState.isLiked = null;
+  recordFilterState.isViewed = null;
+  recordFilterState.isSubmitted = null;
+  recordFilterState.hasLocalImages = null;
+}
+
+export function getFilteredRecords(records: RecordModel[]): RecordModel[] {
+  return records.filter(record => {
+    // Filter by liked status
+    if (recordFilterState.isLiked !== null) {
+      if (record.is_liked !== recordFilterState.isLiked) {
+        return false;
+      }
+    }
+
+    // Filter by viewed status
+    if (recordFilterState.isViewed !== null) {
+      if (record.viewed !== recordFilterState.isViewed) {
+        return false;
+      }
+    }
+
+    // Filter by submitted status
+    if (recordFilterState.isSubmitted !== null) {
+      if (record.is_submitted !== recordFilterState.isSubmitted) {
+        return false;
+      }
+    }
+
+    // Filter by local images
+    if (recordFilterState.hasLocalImages !== null) {
+      const hasImages = record.local_image_count > 0;
+      if (hasImages !== recordFilterState.hasLocalImages) {
+        return false;
+      }
+    }
+
+    return true;
+  });
 }
 
 // 缓存管理函数
@@ -265,4 +375,22 @@ function updateRecordInCache(recordId: string, updates: Partial<RecordModel>): v
   if (record) {
     Object.assign(record, updates);
   }
+}
+
+// 管理任务状态更新函数
+export function updateTaskStatus(taskType: 'idolCrawl' | 'recordPull', status: ManageTaskStatus) {
+  manageTaskState[taskType].status = status;
+  if (status === 'running') {
+    manageTaskState[taskType].startedAt = new Date().toISOString();
+  } else if (status === 'success' || status === 'failed') {
+    manageTaskState[taskType].completedAt = new Date().toISOString();
+  }
+}
+
+export function updateTaskMessage(taskType: 'idolCrawl' | 'recordPull', message: string) {
+  manageTaskState[taskType].message = message;
+}
+
+export function updateTaskProgress(taskType: 'idolCrawl' | 'recordPull', progress: ManageTaskProgress) {
+  manageTaskState[taskType].progress = progress;
 }

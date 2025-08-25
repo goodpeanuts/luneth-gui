@@ -1,7 +1,7 @@
 use luneth::common::ImageData;
 use tauri::Manager as _;
 
-use crate::utils::get_record_image_path;
+use crate::common::get_record_image_path;
 
 // ############
 // # local images

@@ -39,6 +39,15 @@
 
       <div
         class="nav-item"
+        :class="{ active: appState.currentView === 'manage' }"
+        @click="navigateTo('manage')"
+      >
+        <div class="nav-icon">🔧</div>
+        <span class="nav-text">Manage</span>
+      </div>
+
+      <div
+        class="nav-item"
         :class="{ active: appState.currentView === 'config' }"
         @click="navigateTo('config')"
       >

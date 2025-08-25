@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use luneth::{crawl::WebCrawler, record::Recorder};
 use tauri::AppHandle;
 
-use crate::{utils::get_record_image_path, AppError};
+use crate::{common::get_record_image_path, AppError};
 
 pub async fn crawl_record_image(
     app_handle: &AppHandle,

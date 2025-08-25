@@ -124,3 +124,61 @@ pub async fn launch_manual_scrap_task(
         }
     }
 }
+
+#[tauri::command(rename_all = "snake_case")]
+pub async fn launch_idol_scrap_task(
+    app: tauri::AppHandle,
+    state: State<'_, Arc<AppState>>,
+) -> Result<(), String> {
+    let db = Arc::clone(&state.db);
+    let handle = std::thread::spawn(move || {
+        let rt = tokio::runtime::Runtime::new().map_err(|e| e.to_string())?;
+        rt.block_on(async move {
+            let task = Task::new_idol(app, db).await?;
+            log::debug!("Idol scraping task created");
+            task.exec().await?;
+            log::debug!("Idol scraping task completed successfully");
+            Ok::<(), String>(())
+        })
+    });
+
+    match handle.join().map_err(|_e| "Thread panicked".to_owned())? {
+        Ok(_) => {
+            log::info!("Idol scraping task thread completed successfully");
+            Ok(())
+        }
+        Err(e) => {
+            log::error!("Idol scraping task failed: {e}");
+            Err(e)
+        }
+    }
+}
+
+#[tauri::command(rename_all = "snake_case")]
+pub async fn launch_record_pull_task(
+    app: tauri::AppHandle,
+    state: State<'_, Arc<AppState>>,
+) -> Result<(), String> {
+    let db = Arc::clone(&state.db);
+    let handle = std::thread::spawn(move || {
+        let rt = tokio::runtime::Runtime::new().map_err(|e| e.to_string())?;
+        rt.block_on(async move {
+            let task = Task::new_pull_record_slim(app, db).await?;
+            log::debug!("Record pull task created");
+            task.exec().await?;
+            log::debug!("Record pull task completed successfully");
+            Ok::<(), String>(())
+        })
+    });
+
+    match handle.join().map_err(|_e| "Thread panicked".to_owned())? {
+        Ok(_) => {
+            log::info!("Record pull task thread completed successfully");
+            Ok(())
+        }
+        Err(e) => {
+            log::error!("Record pull task failed: {e}");
+            Err(e)
+        }
+    }
+}

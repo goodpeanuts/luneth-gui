@@ -43,6 +43,14 @@
           </li>
           <li>
             <button
+              :class="{ active: appState.currentView === 'manage' }"
+              @click="navigateTo('manage')"
+            >
+              🔧 Manage
+            </button>
+          </li>
+          <li>
+            <button
               :class="{ active: appState.currentView === 'config' }"
               @click="navigateTo('config')"
             >
@@ -70,6 +78,7 @@ import ConfigView from '@/views/ConfigView.vue';
 import RecordListView from '@/views/RecordListView.vue';
 import HistoryListView from '@/views/HistoryListView.vue';
 import CrawlView from '@/views/CrawlView.vue';
+import ManageView from '@/views/ManageView.vue';
 import RecordDetailView from '@/views/RecordDetailView.vue';
 
 // View component mapping
@@ -79,6 +88,7 @@ const viewComponents = {
   record_list: RecordListView,
   history_list: HistoryListView,
   crawl: CrawlView,
+  manage: ManageView,
   record_detail: RecordDetailView,
 };
 

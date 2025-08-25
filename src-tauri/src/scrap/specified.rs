@@ -1,17 +1,55 @@
 use std::fmt::Debug;
 use std::fs;
+use std::sync::Arc;
 
 use luneth::crawl::WebCrawler;
-use tauri::AppHandle;
+use serde::Serialize;
+use tauri::{AppHandle, Emitter as _};
 
-use super::events::{
-    report_crawl_code_result, report_crawl_codes_finished, report_crawl_manual_start, CrawlStatus,
-};
 use crate::db::log::{log_failed_op, log_success_op};
 use crate::scrap::images::crawl_record_image;
+use crate::scrap::TaskType;
 use crate::AppError;
 use luneth_db::entities::record_local::Model as RecorderModel;
-use luneth_db::{DbService, OperationType};
+use luneth_db::{DbOperator, DbService, OperationType};
+
+impl super::Task {
+    pub async fn new_manual(
+        app_handle: AppHandle,
+        db: Arc<DbOperator>,
+        codes: Vec<String>,
+        with_image: bool,
+    ) -> Result<Self, AppError> {
+        log::debug!(
+            "Creating new manual scraping task for {} codes",
+            codes.len()
+        );
+        let task_type = TaskType::Manual(codes, with_image);
+        let crawler = Self::new_crawler().await?;
+        log::debug!("Manual scraping task created successfully");
+        Ok(Self {
+            db,
+            task_type,
+            crawler,
+            app_handle,
+        })
+    }
+
+    pub(super) async fn crawl_manual(
+        &self,
+        codes: &[String],
+        with_image: bool,
+    ) -> Result<(), AppError> {
+        crawl_codes(
+            &self.app_handle,
+            self.db.as_ref(),
+            &self.crawler,
+            codes,
+            with_image,
+        )
+        .await
+    }
+}
 
 pub async fn crawl_codes<T>(
     app_handle: &AppHandle,
@@ -108,4 +146,76 @@ where
     report_crawl_codes_finished(app_handle, success_count, error_count, codes.len());
 
     Ok(())
+}
+
+// Progress status for crawl operations
+#[derive(Debug, Clone, Copy, Serialize)]
+#[serde(rename_all = "camelCase")]
+enum CrawlStatus {
+    Success,
+    Failed,
+}
+
+// Progress events for code crawling
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct CrawlCodeReportEvent {
+    pub code: String,
+    pub status: CrawlStatus,
+    pub message: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct CrawlCodesFinishedEvent {
+    pub success_count: usize,
+    pub error_count: usize,
+    pub total_count: usize,
+}
+
+// Event emission helper functions
+fn report_crawl_manual_start(app_handle: &AppHandle, total_count: usize) {
+    let event = serde_json::json!({
+        "totalCount": total_count
+    });
+    match app_handle.emit("crawl-manual-start", &event) {
+        Ok(_) => log::debug!("Emitted crawl-manual-start event with {total_count} codes"),
+        Err(e) => log::error!("Failed to emit crawl-manual-start event: {e}"),
+    }
+}
+
+fn report_crawl_code_result(
+    app_handle: &AppHandle,
+    code: &str,
+    status: CrawlStatus,
+    message: String,
+) {
+    let event = CrawlCodeReportEvent {
+        code: code.to_owned(),
+        status,
+        message,
+    };
+    match app_handle.emit("crawl-code-report", &event) {
+        Ok(_) => log::debug!("Emitted crawl-code-report event for {code}: {status:?}"),
+        Err(e) => log::error!("Failed to emit crawl-code-report event: {e}"),
+    }
+}
+
+fn report_crawl_codes_finished(
+    app_handle: &AppHandle,
+    success_count: usize,
+    error_count: usize,
+    total_count: usize,
+) {
+    let event = CrawlCodesFinishedEvent {
+        success_count,
+        error_count,
+        total_count,
+    };
+    match app_handle.emit("crawl-codes-finished", &event) {
+        Ok(_) => log::debug!(
+            "Emitted crawl-codes-finished event: {success_count}/{total_count} successful"
+        ),
+        Err(e) => log::error!("Failed to emit crawl-codes-finished event: {e}"),
+    }
 }

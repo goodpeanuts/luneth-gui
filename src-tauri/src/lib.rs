@@ -1,12 +1,11 @@
-mod client;
 mod db {
     pub mod log;
     pub mod read;
     pub mod write;
 }
+mod common;
 mod extract;
 mod scrap;
-mod utils;
 mod command {
     pub mod client;
     pub mod extract;
@@ -31,8 +30,8 @@ use crate::command::{
     image::{get_app_local_data_dir, read_local_record_image},
     interaction::{mark_record_liked, mark_record_unliked, mark_record_viewed},
     scrap::{
-        get_all_op_history, get_all_records, launch_auto_scrap_task, launch_manual_scrap_task,
-        set_task_base_url,
+        get_all_op_history, get_all_records, launch_auto_scrap_task, launch_idol_scrap_task,
+        launch_manual_scrap_task, launch_record_pull_task, set_task_base_url,
     },
 };
 
@@ -56,6 +55,15 @@ pub enum AppError {
 
     #[error("Crawl image error: {0}")]
     CrawlImageError(String),
+
+    #[error("Unknown error occurred: {0}")]
+    UnknownError(String),
+
+    #[error("Auth not set: {0}")]
+    GetAuthFailed(String),
+
+    #[error("Send request Failed: {0}")]
+    SendRequestFailed(String),
 }
 
 impl From<AppError> for String {
@@ -137,6 +145,8 @@ pub fn run() {
             mark_record_viewed,
             mark_record_liked,
             mark_record_unliked,
+            launch_idol_scrap_task,
+            launch_record_pull_task
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
