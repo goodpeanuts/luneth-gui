@@ -136,7 +136,7 @@ const startIdolCrawl = async () => {
 
   try {
     updateTaskStatus('idolCrawl', 'running');
-    await invoke('start_idol_crawl');
+    await invoke('launch_idol_scrap_task');
   } catch (error) {
     console.error('Failed to start idol crawl:', error);
     updateTaskStatus('idolCrawl', 'failed');
@@ -149,7 +149,7 @@ const startRecordPull = async () => {
 
   try {
     updateTaskStatus('recordPull', 'running');
-    await invoke('start_record_pull_slim');
+    await invoke('launch_record_pull_task');
   } catch (error) {
     console.error('Failed to start record pull:', error);
     updateTaskStatus('recordPull', 'failed');

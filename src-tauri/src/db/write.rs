@@ -18,7 +18,7 @@ pub(crate) async fn save_remote_records(
         match db.insert_entity(active_model).await {
             Ok(_) => success_cnt += 1,
             Err(e) => {
-                if e.to_string().contains("duplicate key") {
+                if e.to_string().contains("UNIQUE constraint") {
                     log::debug!("Record already exists, skipping: {id}");
                 } else {
                     log::error!("Failed to save record {id}: {e}");

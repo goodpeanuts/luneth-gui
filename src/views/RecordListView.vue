@@ -166,7 +166,7 @@ import { ref, computed, onMounted } from 'vue';
 import { invoke } from '@tauri-apps/api/core';
 import type { RecordModel, RecordFilterOptions } from '@/types';
 import { navigateTo, appState, getCachedRecords, setCachedRecords, setRecordsLoading, markRecordLiked, markRecordUnliked } from '@/store';
-import { loadCoverImage } from '@/utils/imageLoader';
+import { loadDisplayImage } from '@/utils/imageLoader';
 
 const allRecords = ref<RecordModel[]>([]);
 const isLoading = ref(false);
@@ -259,7 +259,7 @@ async function loadRecordImages(recordList: RecordModel[]) {
   for (const record of recordList) {
     if (record.is_cached_locally && record.cover) {
       try {
-        const imageResult = await loadCoverImage(record.id, record.cover);
+        const imageResult = await loadDisplayImage(record.id, record.cover);
         imageSources.value.set(record.id, imageResult.src);
       } catch (error) {
         console.warn(`Failed to load image for record ${record.id}:`, error);

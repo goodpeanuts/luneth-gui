@@ -15,11 +15,7 @@
           ← Back to Records
         </button>
         <div class="record-actions">
-          <button
-            class="action-btn like"
-            :class="{ active: record.is_liked }"
-            @click="toggleLike"
-          >
+          <button class="action-btn like" :class="{ active: record.is_liked }" @click="toggleLike">
             {{ record.is_liked ? '❤️ Liked' : '🤍 Like' }}
           </button>
           <button class="action-btn submit" :class="{ active: record.is_submitted }">
@@ -89,7 +85,7 @@ import { ref, computed, watch } from 'vue';
 import { appState, navigateTo, markRecordViewed, markRecordLiked, markRecordUnliked } from '@/store';
 import RecordInfo from '@/components/RecordInfo.vue';
 import RecordLinks from '@/components/RecordLinks.vue';
-import { loadSampleImages } from '@/utils/imageLoader';
+import { loadCoverImage, loadSampleImages } from '@/utils/imageLoader';
 import type { ImageLoadResult } from '@/utils/imageLoader';
 
 const activeTab = ref<'info' | 'links'>('info');
@@ -121,6 +117,9 @@ watch(record, async (newRecord) => {
   imageLoading.value = true;
 
   try {
+    const coverResult = await loadCoverImage(newRecord.id, newRecord.cover);
+    coverImageSrc.value = coverResult.src || '';
+
     let allSampleResults: ImageLoadResult[] = [];
 
     if (newRecord.sample_image_links.length > 0) {
@@ -128,24 +127,16 @@ watch(record, async (newRecord) => {
       allSampleResults = await loadSampleImages(newRecord.id, newRecord.sample_image_links);
     }
 
-    // 设置封面图片（sample_image_links 数组中的第一张）
-    if (allSampleResults.length > 0 && allSampleResults[0].src) {
-      coverImageSrc.value = allSampleResults[0].src;
-    } else {
-      coverImageSrc.value = '';
-    }
-
-    // 设置样例图片（除第一张外的其余图片）
+    // 设置样例图片
     sampleImageSrcs.value = allSampleResults
-      .slice(1) // 跳过第一张（已作为封面）
       .filter((result: ImageLoadResult) => result.src) // 只保留成功加载的图片
       .map((result: ImageLoadResult) => result.src);
 
   } catch (error) {
     console.warn('Failed to load images:', error);
-    // 如果加载失败，使用原始 sample_image_links
-    coverImageSrc.value = newRecord.sample_image_links.length > 0 ? newRecord.sample_image_links[0] : '';
-    sampleImageSrcs.value = newRecord.sample_image_links.slice(1) || [];
+    // 如果加载失败，尝试使用原始封面URL，但如果为空则保持空字符串
+    coverImageSrc.value = newRecord.cover || '';
+    sampleImageSrcs.value = newRecord.sample_image_links || [];
   } finally {
     imageLoading.value = false;
   }

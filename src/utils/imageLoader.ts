@@ -57,13 +57,24 @@ export async function loadImage(
 }
 
 /**
+ * 加载展示图片（优先本地）
+ * @param recordId 记录 ID
+ * @param remoteCoverSrc 远程封面 URL
+ * @returns Promise<ImageLoadResult>
+ */
+export async function loadDisplayImage(recordId: string, remoteCoverSrc: string): Promise<ImageLoadResult> {
+  return loadImage(recordId, null, remoteCoverSrc);
+}
+
+
+/**
  * 加载封面图片（优先本地）
  * @param recordId 记录 ID
  * @param remoteCoverSrc 远程封面 URL
  * @returns Promise<ImageLoadResult>
  */
 export async function loadCoverImage(recordId: string, remoteCoverSrc: string): Promise<ImageLoadResult> {
-  return loadImage(recordId, null, remoteCoverSrc);
+  return loadImage(recordId, 0, remoteCoverSrc);
 }
 
 /**
@@ -78,7 +89,7 @@ export async function loadSampleImage(
   sampleIndex: number,
   remoteSampleSrc: string
 ): Promise<ImageLoadResult> {
-  return loadImage(recordId, sampleIndex, remoteSampleSrc);
+  return loadImage(recordId, sampleIndex + 1, remoteSampleSrc);
 }
 
 /**
