@@ -1,19 +1,18 @@
 mod client;
 mod db;
 mod extract;
-mod luneth;
 mod scrap;
+mod utils;
+mod command {
+    pub mod client;
+    pub mod extract;
+    pub mod image;
+    pub mod scrap;
+}
 
 use std::sync::Arc;
 
-// Import all items from the extract module, including process_text
-use crate::luneth::{
-    check_local_image_exists, clear_client_auth, get_all_op_history, get_all_records,
-    get_app_local_data_dir, launch_auto_scrap_task, launch_manual_scrap_task, pull_record_slim,
-    set_client_auth, set_task_base_url,
-};
 use ::luneth::crawl::CrawlError;
-use extract::{export_to_file, process_text, toggle_line_selection};
 use tauri::Manager as _;
 
 #[cfg(debug_assertions)]
@@ -21,6 +20,16 @@ use log::LevelFilter;
 
 #[cfg(not(debug_assertions))]
 use log::LevelFilter;
+
+use crate::command::{
+    client::{clear_client_auth, pull_record_slim, set_client_auth},
+    extract::{export_to_file, process_text, toggle_line_selection},
+    image::{get_app_local_data_dir, read_local_record_image},
+    scrap::{
+        get_all_op_history, get_all_records, launch_auto_scrap_task, launch_manual_scrap_task,
+        set_task_base_url,
+    },
+};
 
 pub(crate) struct AppState {
     pub db: Arc<luneth_db::DbOperator>,
@@ -119,7 +128,7 @@ pub fn run() {
             clear_client_auth,
             pull_record_slim,
             get_app_local_data_dir,
-            check_local_image_exists,
+            read_local_record_image,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

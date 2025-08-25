@@ -30,13 +30,8 @@
           <!-- Cover Image -->
           <div class="cover-section">
             <div class="cover-container">
-              <img
-                v-if="coverImageSrc"
-                :src="coverImageSrc"
-                :alt="record.title"
-                class="cover-image"
-                @error="handleImageError"
-              />
+              <img v-if="coverImageSrc" :src="coverImageSrc" :alt="record.title" class="cover-image"
+                @error="handleImageError" />
               <div v-else class="cover-placeholder">
                 <span>🎬</span>
                 <p>No cover image</p>
@@ -48,17 +43,8 @@
           <div v-if="sampleImageSrcs.length > 0" class="samples-section">
             <h3 class="samples-title">Sample Images</h3>
             <div class="samples-grid">
-              <div
-                v-for="(imageUrl, index) in sampleImageSrcs"
-                :key="index"
-                class="sample-item"
-              >
-                <img
-                  :src="imageUrl"
-                  :alt="`Sample ${index + 1}`"
-                  class="sample-image"
-                  @error="handleImageError"
-                />
+              <div v-for="(imageUrl, index) in sampleImageSrcs" :key="index" class="sample-item">
+                <img :src="imageUrl" :alt="`Sample ${index + 1}`" class="sample-image" @error="handleImageError" />
               </div>
             </div>
           </div>
@@ -68,18 +54,10 @@
         <div class="record-info">
           <!-- Tab Navigation -->
           <div class="tab-navigation">
-            <button
-              class="tab-btn"
-              :class="{ active: activeTab === 'info' }"
-              @click="activeTab = 'info'"
-            >
+            <button class="tab-btn" :class="{ active: activeTab === 'info' }" @click="activeTab = 'info'">
               Details
             </button>
-            <button
-              class="tab-btn"
-              :class="{ active: activeTab === 'links' }"
-              @click="activeTab = 'links'"
-            >
+            <button class="tab-btn" :class="{ active: activeTab === 'links' }" @click="activeTab = 'links'">
               Links
             </button>
           </div>
@@ -107,7 +85,7 @@ import { ref, computed, watch } from 'vue';
 import { appState, navigateTo } from '@/store';
 import RecordInfo from '@/components/RecordInfo.vue';
 import RecordLinks from '@/components/RecordLinks.vue';
-import { loadCoverImage, loadImage } from '@/utils/imageLoader';
+import { loadSampleImages } from '@/utils/imageLoader';
 import type { ImageLoadResult } from '@/utils/imageLoader';
 
 const activeTab = ref<'info' | 'links'>('info');
@@ -130,37 +108,31 @@ watch(record, async (newRecord) => {
   imageLoading.value = true;
 
   try {
-    // 加载封面图片
-    if (newRecord.cover) {
-      if (newRecord.is_cached_locally) {
-        const coverResult = await loadCoverImage(newRecord.id, newRecord.cover);
-        coverImageSrc.value = coverResult.src;
-      } else {
-        coverImageSrc.value = newRecord.cover;
-      }
+    let allSampleResults: ImageLoadResult[] = [];
+
+    if (newRecord.sample_image_links.length > 0) {
+      // 直接使用 sample_image_links 数组
+      allSampleResults = await loadSampleImages(newRecord.id, newRecord.sample_image_links);
     }
 
-    // 加载样例图片 - 基于 local_image_count
-    sampleImageSrcs.value = [];
-    if (newRecord.is_cached_locally && newRecord.local_image_count > 1) {
-      // 样例图片从索引 1 开始（0 是封面）
-      const sampleCount = newRecord.local_image_count - 1;
-      const samplePromises = [];
-      
-      for (let i = 1; i <= sampleCount; i++) {
-        samplePromises.push(loadImage(newRecord.id, i, ''));
-      }
-      
-      const sampleResults = await Promise.all(samplePromises);
-      sampleImageSrcs.value = sampleResults
-        .filter((result: ImageLoadResult) => result.src) // 只保留成功加载的图片
-        .map((result: ImageLoadResult) => result.src);
+    // 设置封面图片（sample_image_links 数组中的第一张）
+    if (allSampleResults.length > 0 && allSampleResults[0].src) {
+      coverImageSrc.value = allSampleResults[0].src;
+    } else {
+      coverImageSrc.value = '';
     }
+
+    // 设置样例图片（除第一张外的其余图片）
+    sampleImageSrcs.value = allSampleResults
+      .slice(1) // 跳过第一张（已作为封面）
+      .filter((result: ImageLoadResult) => result.src) // 只保留成功加载的图片
+      .map((result: ImageLoadResult) => result.src);
+
   } catch (error) {
     console.warn('Failed to load images:', error);
-    // 如果加载失败，使用原始 URL
-    coverImageSrc.value = newRecord.cover || '';
-    sampleImageSrcs.value = [];
+    // 如果加载失败，使用原始 sample_image_links
+    coverImageSrc.value = newRecord.sample_image_links.length > 0 ? newRecord.sample_image_links[0] : '';
+    sampleImageSrcs.value = newRecord.sample_image_links.slice(1) || [];
   } finally {
     imageLoading.value = false;
   }
