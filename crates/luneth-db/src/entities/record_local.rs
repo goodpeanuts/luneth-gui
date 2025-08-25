@@ -1,4 +1,4 @@
-use luneth::record::Recorder;
+use luneth::record::{RecordEntry, Recorder};
 use sea_orm::entity::prelude::*;
 use sea_orm::{ActiveModelTrait, Set};
 use serde::{Deserialize, Serialize};
@@ -90,53 +90,55 @@ impl Model {
     pub fn from_recorder(recorder: &Recorder) -> ActiveModel {
         let mut active_model = ActiveModel::new();
 
-        active_model.id = Set(recorder.id.clone());
+        active_model.id = Set(recorder.record.id.clone());
         active_model.cover = Set(recorder.cover.clone());
-        active_model.title = Set(recorder.title.clone());
-        active_model.release_date = Set(recorder.release_date.clone());
-        active_model.length = Set(recorder.length.clone());
-        active_model.local_image_count = Set(recorder.local_image_count);
+        active_model.title = Set(recorder.record.title.clone());
+        active_model.release_date = Set(recorder.record.release_date.clone());
+        active_model.length = Set(recorder.record.length.clone());
+        active_model.local_image_count = Set(recorder.record.local_image_count);
 
         // 转换 HashMap 为 JSON
-        active_model.director = Set(serde_json::to_value(&recorder.director).unwrap_or_default());
-        active_model.studio = Set(serde_json::to_value(&recorder.studio).unwrap_or_default());
-        active_model.label = Set(serde_json::to_value(&recorder.label).unwrap_or_default());
-        active_model.series = Set(serde_json::to_value(&recorder.series).unwrap_or_default());
-        active_model.genre = Set(serde_json::to_value(&recorder.genre).unwrap_or_default());
-        active_model.idols = Set(serde_json::to_value(&recorder.idols).unwrap_or_default());
+        active_model.director =
+            Set(serde_json::to_value(&recorder.record.director).unwrap_or_default());
+        active_model.studio =
+            Set(serde_json::to_value(&recorder.record.studio).unwrap_or_default());
+        active_model.label = Set(serde_json::to_value(&recorder.record.label).unwrap_or_default());
+        active_model.series =
+            Set(serde_json::to_value(&recorder.record.series).unwrap_or_default());
+        active_model.genre = Set(serde_json::to_value(&recorder.record.genre).unwrap_or_default());
+        active_model.idols = Set(serde_json::to_value(&recorder.record.idols).unwrap_or_default());
 
         // 转换数组为 JSON
         active_model.share_magnet_links =
-            Set(serde_json::to_value(&recorder.share_magnet_links).unwrap_or_default());
+            Set(serde_json::to_value(&recorder.record.share_magnet_links).unwrap_or_default());
 
         active_model
     }
 
     pub fn from_recorder_with_image_local(recorder: &Recorder) -> ActiveModel {
-        let mut active_model = ActiveModel::new();
-
-        active_model.id = Set(recorder.id.clone());
-        active_model.cover = Set(recorder.cover.clone());
-        active_model.title = Set(recorder.title.clone());
-        active_model.release_date = Set(recorder.release_date.clone());
-        active_model.length = Set(recorder.length.clone());
-        active_model.local_image_count = Set(recorder.local_image_count);
-
-        // 转换 HashMap 为 JSON
-        active_model.director = Set(serde_json::to_value(&recorder.director).unwrap_or_default());
-        active_model.studio = Set(serde_json::to_value(&recorder.studio).unwrap_or_default());
-        active_model.label = Set(serde_json::to_value(&recorder.label).unwrap_or_default());
-        active_model.series = Set(serde_json::to_value(&recorder.series).unwrap_or_default());
-        active_model.genre = Set(serde_json::to_value(&recorder.genre).unwrap_or_default());
-        active_model.idols = Set(serde_json::to_value(&recorder.idols).unwrap_or_default());
-
-        // 转换数组为 JSON
-        active_model.share_magnet_links =
-            Set(serde_json::to_value(&recorder.share_magnet_links).unwrap_or_default());
+        let mut active_model = Self::from_recorder(recorder);
 
         // 标记为本地缓存
         active_model.is_cached_locally = Set(true);
 
         active_model
+    }
+
+    pub fn into_record(&self) -> RecordEntry {
+        RecordEntry {
+            id: self.id.clone(),
+            title: self.title.clone(),
+            release_date: self.release_date.clone(),
+            length: self.length.clone(),
+            director: serde_json::from_value(self.director.clone()).unwrap_or_default(),
+            studio: serde_json::from_value(self.studio.clone()).unwrap_or_default(),
+            label: serde_json::from_value(self.label.clone()).unwrap_or_default(),
+            series: serde_json::from_value(self.series.clone()).unwrap_or_default(),
+            genre: serde_json::from_value(self.genre.clone()).unwrap_or_default(),
+            idols: serde_json::from_value(self.idols.clone()).unwrap_or_default(),
+            share_magnet_links: serde_json::from_value(self.share_magnet_links.clone())
+                .unwrap_or_default(),
+            local_image_count: self.local_image_count,
+        }
     }
 }

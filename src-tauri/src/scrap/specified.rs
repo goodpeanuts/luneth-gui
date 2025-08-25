@@ -8,7 +8,7 @@ use super::events::{
     report_crawl_code_result, report_crawl_codes_finished, report_crawl_manual_start, CrawlStatus,
 };
 use crate::db::{log_failed_crawl_record_op, log_success_crawl_record_op};
-use crate::scrap::images::crawl_image;
+use crate::scrap::images::crawl_record_image;
 use crate::AppError;
 use luneth_db::entities::record_local::Model as RecorderModel;
 use luneth_db::DbService;
@@ -38,7 +38,7 @@ where
             Ok(record) => {
                 let mut image_path_dir = None;
                 let record_model = if with_image {
-                    image_path_dir = crawl_image(app_handle, crawler, &record).await.ok();
+                    image_path_dir = crawl_record_image(app_handle, crawler, &record).await.ok();
                     RecorderModel::from_recorder_with_image_local(&record)
                 } else {
                     RecorderModel::from_recorder(&record)

@@ -2227,7 +2227,7 @@ dependencies = [
  "js-sys",
  "log",
  "wasm-bindgen",
- "windows-core 0.58.0",
+ "windows-core 0.61.2",
 ]
 
 [[package]]
@@ -2760,8 +2760,9 @@ checksum = "112b39cec0b298b6c1999fee3e31427f74f676e4cb9879ed1a121b43661a4154"
 [[package]]
 name = "luneth"
 version = "0.1.0"
-source = "git+https://github.com/goodpeanuts/luneth.git?branch=main#1aa3cf47d02015cfaf571c654ab0d62ecb644832"
+source = "git+https://github.com/goodpeanuts/luneth.git?branch=main#3616225fe254d1606e0a746d2fcb0e673c20d08f"
 dependencies = [
+ "base64 0.22.1",
  "chrono",
  "env_logger",
  "futures-util",
@@ -2780,6 +2781,7 @@ dependencies = [
  "tokio",
  "tokio-process",
  "url",
+ "walkdir",
  "zip",
 ]
 
