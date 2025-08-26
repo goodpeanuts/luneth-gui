@@ -4,7 +4,7 @@ use std::sync::Arc;
 use tauri::State;
 use url::Url;
 
-use crate::common::{ClientAuth, CLIENT_AUTH};
+use crate::common::{new_postman, ClientAuth, CLIENT_AUTH};
 use crate::handlers::Task;
 use crate::handlers::TASK_BASE_URL;
 use crate::AppState;
@@ -44,6 +44,16 @@ pub async fn set_client_auth(mut url: String, id: String, secret: String) -> Res
 
     let client_auth = ClientAuth { url, id, secret };
     *CLIENT_AUTH.lock().await = Some(client_auth);
+
+    let mut client = new_postman().await?;
+    for i in 0..3 {
+        if client.authenticate().await.is_ok() {
+            return Ok(());
+        }
+        if i == 2 {
+            return Err("Failed to authenticate client".into());
+        }
+    }
     Ok(())
 }
 

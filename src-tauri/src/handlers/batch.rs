@@ -6,6 +6,7 @@ use luneth::crawl::WebCrawler;
 use serde::Serialize;
 use tauri::{AppHandle, Emitter as _};
 
+use crate::common::EXIST_IDS;
 use crate::db::log::{log_failed_op, log_success_op};
 use crate::handlers::images::crawl_record_image;
 use crate::handlers::TaskType;
@@ -65,11 +66,24 @@ where
     let mut success_count = 0;
     let mut error_count = 0;
 
+    let exist_records = match EXIST_IDS.write().await.fresh(db).await {
+        Ok(()) => EXIST_IDS.read().await.ids.clone(),
+        Err(e) => {
+            log::error!("Failed to refresh existing record IDs: {e}");
+            Vec::new()
+        }
+    };
+
     // Send initial progress event for manual mode
     report_crawl_manual_start(app_handle, codes.len());
 
     for code in codes {
         let code = code.as_ref();
+        if exist_records.contains(&code.to_owned()) {
+            log::debug!("skip, {code} already exist");
+            continue;
+        }
+
         log::debug!("Crawling code: {code}");
 
         match crawler.crawl_code(code).await {

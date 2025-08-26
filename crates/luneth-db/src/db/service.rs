@@ -1,7 +1,7 @@
 use super::{Model, Result};
 use sea_orm::{
-    ActiveModelTrait, DatabaseConnection, EntityTrait, IntoActiveModel, PrimaryKeyTrait,
-    sea_query::IntoCondition,
+    ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, IntoActiveModel,
+    PrimaryKeyTrait, sea_query::IntoCondition,
 };
 
 #[expect(async_fn_in_trait)]
@@ -49,4 +49,22 @@ pub trait DbService {
     where
         E: EntityTrait,
         <<E as EntityTrait>::PrimaryKey as PrimaryKeyTrait>::ValueType: for<'a> From<&'a str>;
+
+    /// Query specified column values from an entity table
+    async fn query_specified_column<E, C, T>(&self, column: C) -> Result<Vec<T>>
+    where
+        E: EntityTrait,
+        C: ColumnTrait,
+        T: sea_orm::TryGetable + Send;
 }
+
+// 使用示例：可以用通用函数查询其他列
+//
+// // 查询所有本地记录的标题
+// let titles: Vec<String> = db.query_specified_column::<record_local::Entity, _, String>(record_local::Column::Title).await?;
+//
+// // 查询所有本地记录的图片数量
+// let counts: Vec<i32> = db.query_specified_column::<record_local::Entity, _, i32>(record_local::Column::LocalImageCount).await?;
+//
+// // 查询所有远程记录的发布日期
+// let dates: Vec<String> = db.query_specified_column::<record_remote::Entity, _, String>(record_remote::Column::Date).await?;

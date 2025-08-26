@@ -36,7 +36,7 @@ impl super::Task {
         // Report start event
         report_idol_crawl_start(&self.app_handle, total_count);
 
-        let links = idol_without_image
+        let idol_links = idol_without_image
             .iter()
             .map(|idol| (idol.id, idol.link.as_str()))
             .collect::<Vec<(i64, &str)>>();
@@ -45,13 +45,22 @@ impl super::Task {
         let mut success_count = 0;
         let mut processed_count = 0;
 
-        let images_with_id = self.crawler.crawl_idol_images(&links).await;
-
-        for id_with_image in images_with_id {
+        for (id, link) in idol_links {
             processed_count += 1;
 
-            match id_with_image {
-                Ok((id, image)) => {
+            let image = self.crawler.crawl_idol_image(link).await;
+
+            match image {
+                Ok(image) => {
+                    // block page
+                    if image.mime.contains("html") {
+                        log::error!("Crawled HTML content for idol {}", image.name);
+                        let error_msg = format!("Crawled HTML content for idol {}", image.name);
+                        error.push_str(&format!("{error_msg}\n"));
+                        report_idol_crawl_progress(&self.app_handle, processed_count, error_msg);
+                        continue;
+                    }
+
                     let upload = UploadImageDto {
                         id: id.to_string(),
                         images: vec![image],

@@ -1,7 +1,7 @@
 use super::{Model, Result};
 use sea_orm::{
-    ActiveModelTrait, DatabaseConnection, EntityTrait, IntoActiveModel, PrimaryKeyTrait,
-    QueryFilter as _, QuerySelect as _, sea_query::IntoCondition,
+    ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, IntoActiveModel,
+    PrimaryKeyTrait, QueryFilter as _, QuerySelect as _, sea_query::IntoCondition,
 };
 
 impl super::service::DbService for super::DbOperator {
@@ -115,5 +115,22 @@ impl super::service::DbService for super::DbOperator {
     {
         let result = E::find_by_id(id).one(&self.db).await?;
         Ok(result)
+    }
+
+    /// Query specified column values from an entity table
+    async fn query_specified_column<E, C, T>(&self, column: C) -> Result<Vec<T>>
+    where
+        E: EntityTrait,
+        C: ColumnTrait,
+        T: sea_orm::TryGetable + Send,
+    {
+        let results: Vec<T> = E::find()
+            .select_only()
+            .column(column)
+            .into_tuple()
+            .all(&self.db)
+            .await?;
+
+        Ok(results)
     }
 }

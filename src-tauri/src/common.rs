@@ -1,10 +1,27 @@
 use std::{path::PathBuf, sync::LazyLock};
 
 use luneth::client::Postman;
+use luneth_db::DbService;
 use tauri::{AppHandle, Manager as _};
-use tokio::sync::Mutex;
+use tokio::sync::{Mutex, RwLock};
 
-use crate::AppError;
+use crate::{db::read::get_exist_record_ids, AppError};
+
+pub static EXIST_IDS: LazyLock<RwLock<ExistIDs>> =
+    LazyLock::new(|| RwLock::new(ExistIDs::default()));
+
+#[derive(Default)]
+pub struct ExistIDs {
+    pub ids: Vec<String>,
+}
+
+impl ExistIDs {
+    pub async fn fresh(&mut self, db: &impl DbService) -> Result<(), AppError> {
+        let new = get_exist_record_ids(db).await?;
+        self.ids = new;
+        Ok(())
+    }
+}
 
 pub fn get_local_image_path(app_handle: &AppHandle) -> Result<PathBuf, AppError> {
     // 获取应用本地数据目录 - Tauri v2 API

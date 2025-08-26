@@ -16,7 +16,7 @@ pub async fn get_all_records(
 ) -> Result<Vec<RecorderModel>, String> {
     log::debug!("Fetching all records from database");
     let db = Arc::clone(&state.db);
-    let records = get_records(db.as_ref()).await.map_err(|e| e.clone())?;
+    let records = get_records(db.as_ref()).await.map_err(|e| e.to_string())?;
     log::info!("Retrieved {} records from database", records.len());
     Ok(records)
 }
@@ -27,7 +27,9 @@ pub async fn get_all_op_history(
 ) -> Result<Vec<luneth_db::history_op::Model>, String> {
     log::debug!("Fetching operation history from database");
     let db = Arc::clone(&state.db);
-    let history = get_op_history(db.as_ref()).await.map_err(|e| e.clone())?;
+    let history = get_op_history(db.as_ref())
+        .await
+        .map_err(|e| e.to_string())?;
     log::info!("Retrieved {} operation history records", history.len());
     Ok(history)
 }
