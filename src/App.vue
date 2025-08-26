@@ -43,6 +43,14 @@
           </li>
           <li>
             <button
+              :class="{ active: appState.currentView === 'manage' }"
+              @click="navigateTo('manage')"
+            >
+              🔧 Manage
+            </button>
+          </li>
+          <li>
+            <button
               :class="{ active: appState.currentView === 'config' }"
               @click="navigateTo('config')"
             >
@@ -61,8 +69,8 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
-import { appState, navigateTo } from '@/store';
+import { computed, onMounted, onUnmounted } from 'vue';
+import { appState, navigateTo, initializeGlobalEventListeners, cleanupEventListeners } from '@/store';
 
 // Components
 import HomeView from '@/views/HomeView.vue';
@@ -70,6 +78,7 @@ import ConfigView from '@/views/ConfigView.vue';
 import RecordListView from '@/views/RecordListView.vue';
 import HistoryListView from '@/views/HistoryListView.vue';
 import CrawlView from '@/views/CrawlView.vue';
+import ManageView from '@/views/ManageView.vue';
 import RecordDetailView from '@/views/RecordDetailView.vue';
 
 // View component mapping
@@ -79,12 +88,25 @@ const viewComponents = {
   record_list: RecordListView,
   history_list: HistoryListView,
   crawl: CrawlView,
+  manage: ManageView,
   record_detail: RecordDetailView,
 };
 
 // Current view component
 const currentViewComponent = computed(() => {
   return viewComponents[appState.currentView] || HomeView;
+});
+
+// 初始化全局事件监听
+onMounted(async () => {
+  console.log('[App] Initializing global event listeners');
+  await initializeGlobalEventListeners();
+});
+
+// 清理事件监听
+onUnmounted(() => {
+  console.log('[App] Cleaning up global event listeners');
+  cleanupEventListeners();
 });
 </script>
 
@@ -181,8 +203,10 @@ body {
 
 .main-content {
   flex: 1;
-  overflow: hidden;
+  overflow-y: auto;
   background-color: #ffffff;
+  height: 100vh;
+  scroll-behavior: smooth; /* 添加平滑滚动 */
 }
 
 /* Scrollbar styling */

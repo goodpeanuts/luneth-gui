@@ -15,7 +15,7 @@
           ← Back to Records
         </button>
         <div class="record-actions">
-          <button class="action-btn like" :class="{ active: record.is_liked }">
+          <button class="action-btn like" :class="{ active: record.is_liked }" @click="toggleLike">
             {{ record.is_liked ? '❤️ Liked' : '🤍 Like' }}
           </button>
           <button class="action-btn submit" :class="{ active: record.is_submitted }">
@@ -30,13 +30,8 @@
           <!-- Cover Image -->
           <div class="cover-section">
             <div class="cover-container">
-              <img
-                v-if="record.cover"
-                :src="record.cover"
-                :alt="record.title"
-                class="cover-image"
-                @error="handleImageError"
-              />
+              <img v-if="coverImageSrc" :src="coverImageSrc" :alt="record.title" class="cover-image"
+                @error="handleImageError" />
               <div v-else class="cover-placeholder">
                 <span>🎬</span>
                 <p>No cover image</p>
@@ -45,20 +40,11 @@
           </div>
 
           <!-- Sample Images -->
-          <div v-if="record.sample_image_links.length > 0" class="samples-section">
+          <div v-if="sampleImageSrcs.length > 0" class="samples-section">
             <h3 class="samples-title">Sample Images</h3>
             <div class="samples-grid">
-              <div
-                v-for="(imageUrl, index) in record.sample_image_links"
-                :key="index"
-                class="sample-item"
-              >
-                <img
-                  :src="imageUrl"
-                  :alt="`Sample ${index + 1}`"
-                  class="sample-image"
-                  @error="handleImageError"
-                />
+              <div v-for="(imageUrl, index) in sampleImageSrcs" :key="index" class="sample-item">
+                <img :src="imageUrl" :alt="`Sample ${index + 1}`" class="sample-image" @error="handleImageError" />
               </div>
             </div>
           </div>
@@ -68,18 +54,10 @@
         <div class="record-info">
           <!-- Tab Navigation -->
           <div class="tab-navigation">
-            <button
-              class="tab-btn"
-              :class="{ active: activeTab === 'info' }"
-              @click="activeTab = 'info'"
-            >
+            <button class="tab-btn" :class="{ active: activeTab === 'info' }" @click="activeTab = 'info'">
               Details
             </button>
-            <button
-              class="tab-btn"
-              :class="{ active: activeTab === 'links' }"
-              @click="activeTab = 'links'"
-            >
+            <button class="tab-btn" :class="{ active: activeTab === 'links' }" @click="activeTab = 'links'">
               Links
             </button>
           </div>
@@ -103,14 +81,82 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue';
-import { appState, navigateTo } from '@/store';
+import { ref, computed, watch } from 'vue';
+import { appState, navigateTo, markRecordViewed, markRecordLiked, markRecordUnliked } from '@/store';
 import RecordInfo from '@/components/RecordInfo.vue';
 import RecordLinks from '@/components/RecordLinks.vue';
+import { loadCoverImage, loadSampleImages } from '@/utils/imageLoader';
+import type { ImageLoadResult } from '@/utils/imageLoader';
 
 const activeTab = ref<'info' | 'links'>('info');
 
 const record = computed(() => appState.selectedRecord);
+
+// 图片加载状态
+const coverImageSrc = ref<string>('');
+const sampleImageSrcs = ref<string[]>([]);
+const imageLoading = ref(false);
+
+// 监听记录变化，加载对应的图片并标记为已查看
+watch(record, async (newRecord) => {
+  if (!newRecord) {
+    coverImageSrc.value = '';
+    sampleImageSrcs.value = [];
+    return;
+  }
+
+  // 标记为已查看（如果还未查看）
+  if (!newRecord.viewed) {
+    try {
+      await markRecordViewed(newRecord.id);
+    } catch (error) {
+      console.warn('Failed to mark record as viewed:', error);
+    }
+  }
+
+  imageLoading.value = true;
+
+  try {
+    const coverResult = await loadCoverImage(newRecord.id, newRecord.cover);
+    coverImageSrc.value = coverResult.src || '';
+
+    let allSampleResults: ImageLoadResult[] = [];
+
+    if (newRecord.sample_image_links.length > 0) {
+      // 直接使用 sample_image_links 数组
+      allSampleResults = await loadSampleImages(newRecord.id, newRecord.sample_image_links);
+    }
+
+    // 设置样例图片
+    sampleImageSrcs.value = allSampleResults
+      .filter((result: ImageLoadResult) => result.src) // 只保留成功加载的图片
+      .map((result: ImageLoadResult) => result.src);
+
+  } catch (error) {
+    console.warn('Failed to load images:', error);
+    // 如果加载失败，尝试使用原始封面URL，但如果为空则保持空字符串
+    coverImageSrc.value = newRecord.cover || '';
+    sampleImageSrcs.value = newRecord.sample_image_links || [];
+  } finally {
+    imageLoading.value = false;
+  }
+}, { immediate: true });
+
+// 切换喜欢状态
+async function toggleLike() {
+  if (!record.value) return;
+
+  try {
+    if (record.value.is_liked) {
+      await markRecordUnliked(record.value.id);
+    } else {
+      await markRecordLiked(record.value.id);
+    }
+  } catch (error) {
+    console.error('Failed to toggle like status:', error);
+    // 可以在这里添加错误提示
+  }
+}
 
 function handleImageError(event: Event) {
   const img = event.target as HTMLImageElement;

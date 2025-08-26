@@ -8,6 +8,7 @@
   "opener:default",
   "dialog:allow-open",
   "dialog:allow-save",
+  "log:default",
     {
       "identifier": "fs:allow-write-text-file",
       "allow": [
@@ -16,6 +17,14 @@
         { "path": "$DOWNLOAD/**" },
         { "path": "$DESKTOP/**" }
       ]
-    }
+    },
+    {
+      "identifier": "fs:allow-read-file",
+      "allow": [
+        { "path": "$APPLOCALDATA/**" }
+      ]
+    },
+    "core:path:default",
+    "core:event:default"
   ]
 }

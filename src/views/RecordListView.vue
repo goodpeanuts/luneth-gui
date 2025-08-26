@@ -8,6 +8,57 @@
       </button>
     </div>
 
+    <!-- Filter Controls -->
+    <div class="filter-section">
+      <h3 class="filter-title">Filters</h3>
+      <div class="filter-controls">
+        <div class="filter-group">
+          <label class="filter-label">Liked Status:</label>
+          <select v-model="filters.isLiked" @change="applyFilters" class="filter-select">
+            <option :value="null">All</option>
+            <option :value="true">Liked Only</option>
+            <option :value="false">Not Liked</option>
+          </select>
+        </div>
+
+        <div class="filter-group">
+          <label class="filter-label">Viewed Status:</label>
+          <select v-model="filters.isViewed" @change="applyFilters" class="filter-select">
+            <option :value="null">All</option>
+            <option :value="true">Viewed Only</option>
+            <option :value="false">Not Viewed</option>
+          </select>
+        </div>
+
+        <div class="filter-group">
+          <label class="filter-label">Submitted Status:</label>
+          <select v-model="filters.isSubmitted" @change="applyFilters" class="filter-select">
+            <option :value="null">All</option>
+            <option :value="true">Submitted Only</option>
+            <option :value="false">Not Submitted</option>
+          </select>
+        </div>
+
+        <div class="filter-group">
+          <label class="filter-label">Local Images:</label>
+          <select v-model="filters.hasLocalImages" @change="applyFilters" class="filter-select">
+            <option :value="null">All</option>
+            <option :value="true">Has Local Images</option>
+            <option :value="false">No Local Images</option>
+          </select>
+        </div>
+
+        <div class="filter-actions">
+          <button class="clear-filters-btn" @click="clearFilters">
+            Clear Filters
+          </button>
+          <div class="filter-results">
+            {{ filteredRecords.length }} of {{ allRecords.length }} records
+          </div>
+        </div>
+      </div>
+    </div>
+
     <div v-if="isLoading && !hasCached" class="loading-state">
       <div class="loading-spinner"></div>
       <p>Loading records...</p>
@@ -19,7 +70,7 @@
       <button class="retry-btn" @click="loadRecords">Retry</button>
     </div>
 
-    <div v-else-if="records.length === 0" class="empty-state">
+    <div v-else-if="filteredRecords.length === 0 && allRecords.length === 0" class="empty-state">
       <div class="empty-icon">📝</div>
       <p class="empty-text">No records found</p>
       <p class="empty-hint">Start crawling to create records</p>
@@ -28,18 +79,28 @@
       </button>
     </div>
 
+    <div v-else-if="filteredRecords.length === 0 && allRecords.length > 0" class="empty-state">
+      <div class="empty-icon">🔍</div>
+      <p class="empty-text">No records match current filters</p>
+      <p class="empty-hint">Try adjusting your filter criteria</p>
+      <button class="clear-filters-btn" @click="clearFilters">
+        Clear Filters
+      </button>
+    </div>
+
     <div v-else class="records-container">
       <div class="records-list">
         <div
-          v-for="record in records"
+          v-for="record in filteredRecords"
           :key="record.id"
           class="record-item"
+          :class="{ 'unviewed': !record.viewed }"
           @click="openRecordDetail(record)"
         >
           <div class="record-thumbnail">
             <img
-              v-if="record.cover"
-              :src="record.cover"
+              v-if="getImageSrc(record)"
+              :src="getImageSrc(record)"
               :alt="record.title"
               class="record-cover"
               @error="handleImageError"
@@ -55,7 +116,11 @@
               <div class="record-badges">
                 <div class="status-indicators">
                   <!-- 喜欢状态 -->
-                  <div class="status-icon liked" :class="{ active: record.is_liked }">
+                  <div
+                    class="status-icon liked"
+                    :class="{ active: record.is_liked }"
+                    @click.stop="toggleRecordLike(record)"
+                  >
                     <svg width="20" height="20" viewBox="0 0 24 24" :fill="record.is_liked ? '#dc3545' : 'none'" stroke="#dc3545" stroke-width="2">
                       <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
                     </svg>
@@ -97,22 +162,70 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
+import { ref, computed, onMounted } from 'vue';
 import { invoke } from '@tauri-apps/api/core';
-import type { RecordModel } from '@/types';
-import { navigateTo, appState, getCachedRecords, setCachedRecords, setRecordsLoading } from '@/store';
+import type { RecordModel, RecordFilterOptions } from '@/types';
+import { navigateTo, appState, getCachedRecords, setCachedRecords, setRecordsLoading, markRecordLiked, markRecordUnliked } from '@/store';
+import { loadDisplayImage } from '@/utils/imageLoader';
 
-const records = ref<RecordModel[]>([]);
+const allRecords = ref<RecordModel[]>([]);
 const isLoading = ref(false);
 const hasCached = ref(false);
 const error = ref('');
+
+// 筛选选项
+const filters = ref<RecordFilterOptions>({
+  isLiked: null,
+  isViewed: null,
+  isSubmitted: null,
+  hasLocalImages: null,
+});
+
+// 存储图片加载结果的映射
+const imageSources = ref<Map<string, string>>(new Map());
+
+// 计算筛选后的记录
+const filteredRecords = computed(() => {
+  return allRecords.value.filter(record => {
+    // Filter by liked status
+    if (filters.value.isLiked !== null) {
+      if (record.is_liked !== filters.value.isLiked) {
+        return false;
+      }
+    }
+
+    // Filter by viewed status
+    if (filters.value.isViewed !== null) {
+      if (record.viewed !== filters.value.isViewed) {
+        return false;
+      }
+    }
+
+    // Filter by submitted status
+    if (filters.value.isSubmitted !== null) {
+      if (record.is_submitted !== filters.value.isSubmitted) {
+        return false;
+      }
+    }
+
+    // Filter by local images
+    if (filters.value.hasLocalImages !== null) {
+      const hasImages = record.local_image_count > 0;
+      if (hasImages !== filters.value.hasLocalImages) {
+        return false;
+      }
+    }
+
+    return true;
+  });
+});
 
 onMounted(() => {
   // 首先显示缓存数据（如果有的话）
   const cachedRecords = getCachedRecords();
   if (cachedRecords.length > 0) {
     hasCached.value = true;
-    records.value = cachedRecords;
+    allRecords.value = cachedRecords;
   }
 
   // 然后加载新数据
@@ -128,15 +241,40 @@ async function loadRecords() {
     const result = await invoke<RecordModel[]>('get_all_records');
     // 按创建时间从新到旧排序
     const sortedRecords = result.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-    records.value = sortedRecords;
+    allRecords.value = sortedRecords;
     // 更新缓存
     setCachedRecords(sortedRecords);
+
+    // 加载图片
+    await loadRecordImages(sortedRecords);
   } catch (err) {
     error.value = `Failed to load records: ${err}`;
   } finally {
     isLoading.value = false;
     setRecordsLoading(false);
   }
+}
+
+async function loadRecordImages(recordList: RecordModel[]) {
+  for (const record of recordList) {
+    if (record.is_cached_locally && record.cover) {
+      try {
+        const imageResult = await loadDisplayImage(record.id, record.cover);
+        imageSources.value.set(record.id, imageResult.src);
+      } catch (error) {
+        console.warn(`Failed to load image for record ${record.id}:`, error);
+        // 如果加载失败，使用原始封面 URL
+        imageSources.value.set(record.id, record.cover);
+      }
+    } else if (record.cover) {
+      // 如果没有本地缓存，直接使用远程 URL
+      imageSources.value.set(record.id, record.cover);
+    }
+  }
+}
+
+function getImageSrc(record: RecordModel): string {
+  return imageSources.value.get(record.id) || record.cover || '';
 }
 
 function openRecordDetail(record: RecordModel) {
@@ -153,9 +291,40 @@ function formatDate(dateString: string): string {
   }
 }
 
+// 切换喜欢状态
+async function toggleRecordLike(record: RecordModel) {
+  try {
+    if (record.is_liked) {
+      await markRecordUnliked(record.id);
+      record.is_liked = false;
+    } else {
+      await markRecordLiked(record.id);
+      record.is_liked = true;
+    }
+  } catch (error) {
+    console.error('Failed to toggle like status:', error);
+    // 可以在这里添加错误提示
+  }
+}
+
 function handleImageError(event: Event) {
   const img = event.target as HTMLImageElement;
   img.style.display = 'none';
+}
+
+// 筛选相关函数
+function applyFilters() {
+  // filteredRecords 是计算属性，会自动响应 filters 的变化
+  console.log('Filters applied:', filters.value);
+}
+
+function clearFilters() {
+  filters.value = {
+    isLiked: null,
+    isViewed: null,
+    isSubmitted: null,
+    hasLocalImages: null,
+  };
 }
 </script>
 
@@ -202,6 +371,86 @@ function handleImageError(event: Event) {
 .refresh-btn:disabled {
   background-color: #6c757d;
   cursor: not-allowed;
+}
+
+/* Filter section styles */
+.filter-section {
+  margin-bottom: 24px;
+  padding: 16px;
+  background: #f8f9fa;
+  border-radius: 8px;
+  border: 1px solid #e9ecef;
+}
+
+.filter-title {
+  font-size: 1.2rem;
+  font-weight: 600;
+  color: #495057;
+  margin: 0 0 16px 0;
+}
+
+.filter-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  align-items: center;
+}
+
+.filter-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 150px;
+}
+
+.filter-label {
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: #6c757d;
+}
+
+.filter-select {
+  padding: 6px 8px;
+  border: 1px solid #ced4da;
+  border-radius: 4px;
+  background: white;
+  font-size: 0.9rem;
+  color: #495057;
+  cursor: pointer;
+}
+
+.filter-select:focus {
+  outline: none;
+  border-color: #007bff;
+  box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
+}
+
+.filter-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.clear-filters-btn {
+  padding: 6px 12px;
+  background-color: #6c757d;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  transition: background-color 0.2s ease;
+}
+
+.clear-filters-btn:hover {
+  background-color: #5a6268;
+}
+
+.filter-results {
+  font-size: 0.85rem;
+  color: #6c757d;
+  text-align: center;
 }
 
 .loading-state, .error-state, .empty-state {
@@ -261,50 +510,50 @@ function handleImageError(event: Event) {
 .records-container {
   flex: 1;
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 
 .records-list {
-  height: 100%;
-  overflow-y: auto;
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
   gap: 16px;
-  padding: 4px; /* 为阴影留出空间 */
-}
-
-@media (max-width: 768px) {
-  .records-list {
-    grid-template-columns: 1fr;
-  }
+  overflow-y: auto;
+  padding: 4px;
 }
 
 .record-item {
   display: flex;
-  align-items: center;
   background: white;
   border: 1px solid #e9ecef;
-  border-radius: 12px;
+  border-radius: 8px;
   padding: 16px;
   cursor: pointer;
   transition: all 0.2s ease;
   gap: 16px;
-  max-width: 100%;
-  min-height: 120px;
 }
 
 .record-item:hover {
   transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
   border-color: #007bff;
 }
 
+.record-item.unviewed {
+  background-color: #e3f2fd;
+  border-color: #bbdefb;
+}
+
 .record-thumbnail {
-  width: 80px;
-  height: 80px;
   flex-shrink: 0;
-  border-radius: 8px;
+  width: 80px;
+  height: 120px;
   overflow: hidden;
-  background-color: #f8f9fa;
+  border-radius: 6px;
+  background: #f8f9fa;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .record-cover {
@@ -314,17 +563,15 @@ function handleImageError(event: Event) {
 }
 
 .record-cover-placeholder {
-  width: 100%;
-  height: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 2rem;
   color: #6c757d;
+  font-size: 2rem;
 }
 
 .record-info {
   flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
   min-width: 0;
 }
 
@@ -332,24 +579,23 @@ function handleImageError(event: Event) {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  margin-bottom: 12px;
+  gap: 12px;
 }
 
 .record-title {
-  font-size: 1.2rem;
-  font-weight: 600;
-  color: #333;
   margin: 0;
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #2c3e50;
+  line-height: 1.3;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  max-width: 400px;
+  flex: 1;
 }
 
 .record-badges {
-  display: flex;
-  gap: 8px;
-  align-items: center;
+  flex-shrink: 0;
 }
 
 .status-indicators {
@@ -359,49 +605,23 @@ function handleImageError(event: Event) {
 }
 
 .status-icon {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  background-color: #f8f9fa;
-  transition: all 0.2s ease;
   cursor: pointer;
+  transition: transform 0.2s ease;
+  padding: 4px;
+  border-radius: 4px;
 }
 
 .status-icon:hover {
-  background-color: #e9ecef;
   transform: scale(1.1);
+  background: rgba(0, 0, 0, 0.05);
 }
 
-.status-icon.liked.active {
-  background-color: #ffe6e6;
+.status-icon.liked.active svg {
+  fill: #dc3545;
 }
 
-.status-icon.submitted.active {
-  background-color: #e6f3ff;
-}
-
-.status-icon svg {
-  transition: all 0.2s ease;
-}
-
-.badge {
-  padding: 4px 8px;
-  border-radius: 4px;
-  font-size: 0.8rem;
-  font-weight: 500;
-}
-
-.badge.liked {
-  background-color: #ffe6e6;
-  color: #dc3545;
-}
-
-.badge.submitted {
-  background-color: #e6f7e6;
-  color: #28a745;
+.status-icon.submitted.active svg {
+  fill: #007bff;
 }
 
 .record-meta {
@@ -412,27 +632,63 @@ function handleImageError(event: Event) {
 
 .meta-item {
   display: flex;
-  align-items: center;
   gap: 8px;
-  font-size: 0.9rem;
+  font-size: 0.85rem;
 }
 
 .meta-label {
-  font-weight: 600;
-  color: #666;
+  font-weight: 500;
+  color: #6c757d;
   min-width: 60px;
 }
 
 .meta-value {
-  color: #333;
+  color: #495057;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .record-arrow {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
   color: #6c757d;
   font-size: 1.2rem;
-  font-weight: bold;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+  .filter-controls {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .filter-group {
+    min-width: auto;
+  }
+
+  .filter-actions {
+    margin-left: 0;
+    margin-top: 16px;
+  }
+
+  .records-list {
+    grid-template-columns: 1fr;
+  }
+
+  .record-item {
+    flex-direction: column;
+    text-align: center;
+  }
+
+  .record-header {
+    justify-content: center;
+  }
+
+  .record-title {
+    white-space: normal;
+    text-align: center;
+  }
 }
 </style>

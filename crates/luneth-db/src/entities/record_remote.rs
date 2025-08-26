@@ -1,39 +1,39 @@
+use luneth::common::RecordSlimDto;
 use sea_orm::entity::prelude::*;
 use sea_orm::{ActiveModelTrait, Set};
 use serde::{Deserialize, Serialize};
-// use crate::recorder::Recorder;
-use luneth::record::Recorder;
 
 #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel, Serialize, Deserialize)]
 #[sea_orm(table_name = "record_remote")]
 pub struct Model {
     #[sea_orm(primary_key, auto_increment = false)]
     pub id: String,
-    pub url: String,
-    #[sea_orm(column_type = "Text")]
-    pub html: String,
-    pub cover: String,
+
     pub title: String,
-    pub release_date: String,
-    pub length: String,
+
+    pub date: String,
+
+    pub duration: i32,
+
+    pub director: String,
+
+    pub studio: String,
+
+    pub label: String,
+
+    pub series: String,
+
     #[sea_orm(column_type = "Json")]
-    pub director: Json,
-    #[sea_orm(column_type = "Json")]
-    pub studio: Json,
-    #[sea_orm(column_type = "Json")]
-    pub label: Json,
-    #[sea_orm(column_type = "Json")]
-    pub series: Json,
-    #[sea_orm(column_type = "Json")]
-    pub genre: Json,
+    pub genres: Json,
+
     #[sea_orm(column_type = "Json")]
     pub idols: Json,
+
+    pub has_links: bool,
+
     #[sea_orm(column_type = "Json")]
-    pub share_magnet_links: Json,
-    #[sea_orm(column_type = "Json")]
-    pub sample_image_links: Json,
-    pub local_image_count: i32,
-    pub is_cached_locally: bool,
+    pub links: Json,
+
     pub created_at: ChronoDateTimeUtc,
     pub updated_at: ChronoDateTimeUtc,
 }
@@ -45,16 +45,10 @@ impl ActiveModelBehavior for ActiveModel {
     fn new() -> Self {
         Self {
             id: Set(uuid::Uuid::new_v4().to_string()),
-            is_cached_locally: Set(false),
-            local_image_count: Set(0),
-            director: Set(Json::Object(serde_json::Map::new())),
-            studio: Set(Json::Object(serde_json::Map::new())),
-            label: Set(Json::Object(serde_json::Map::new())),
-            series: Set(Json::Object(serde_json::Map::new())),
-            genre: Set(Json::Object(serde_json::Map::new())),
-            idols: Set(Json::Object(serde_json::Map::new())),
-            share_magnet_links: Set(Json::Array(vec![])),
-            sample_image_links: Set(Json::Array(vec![])),
+            genres: Set(Json::Array(vec![])),
+            idols: Set(Json::Array(vec![])),
+            has_links: Set(false),
+            links: Set(Json::Array(vec![])),
             created_at: Set(chrono::Utc::now()),
             updated_at: Set(chrono::Utc::now()),
             ..ActiveModelTrait::default()
@@ -84,34 +78,29 @@ impl ActiveModelBehavior for ActiveModel {
     }
 }
 
+impl From<RecordSlimDto> for ActiveModel {
+    fn from(dto: RecordSlimDto) -> Self {
+        Self {
+            id: Set(dto.id),
+            title: Set(dto.title),
+            date: Set(dto.date),
+            duration: Set(dto.duration),
+            director: Set(dto.director),
+            studio: Set(dto.studio),
+            label: Set(dto.label),
+            series: Set(dto.series),
+            genres: Set(serde_json::to_value(&dto.genres).unwrap_or(Json::Array(vec![]))),
+            idols: Set(serde_json::to_value(&dto.idols).unwrap_or(Json::Array(vec![]))),
+            has_links: Set(dto.has_links),
+            links: Set(serde_json::to_value(&dto.links).unwrap_or(Json::Array(vec![]))),
+            created_at: Set(chrono::Utc::now()),
+            updated_at: Set(chrono::Utc::now()),
+        }
+    }
+}
+
 impl Model {
-    /// 从 Recorder 结构体创建 `ActiveModel`
-    pub fn from_recorder(recorder: &Recorder) -> ActiveModel {
-        let mut active_model = ActiveModel::new();
-
-        active_model.id = Set(recorder.id.clone());
-        active_model.url = Set(recorder.url.clone());
-        active_model.html = Set(recorder.html.clone());
-        active_model.cover = Set(recorder.cover.clone());
-        active_model.title = Set(recorder.title.clone());
-        active_model.release_date = Set(recorder.release_date.clone());
-        active_model.length = Set(recorder.length.clone());
-        active_model.local_image_count = Set(recorder.local_image_count);
-
-        // 转换 HashMap 为 JSON
-        active_model.director = Set(serde_json::to_value(&recorder.director).unwrap_or_default());
-        active_model.studio = Set(serde_json::to_value(&recorder.studio).unwrap_or_default());
-        active_model.label = Set(serde_json::to_value(&recorder.label).unwrap_or_default());
-        active_model.series = Set(serde_json::to_value(&recorder.series).unwrap_or_default());
-        active_model.genre = Set(serde_json::to_value(&recorder.genre).unwrap_or_default());
-        active_model.idols = Set(serde_json::to_value(&recorder.idols).unwrap_or_default());
-
-        // 转换数组为 JSON
-        active_model.share_magnet_links =
-            Set(serde_json::to_value(&recorder.share_magnet_links).unwrap_or_default());
-        active_model.sample_image_links =
-            Set(serde_json::to_value(&recorder.sample_image_links).unwrap_or_default());
-
-        active_model
+    pub fn from_record_slim_dto(dto: RecordSlimDto) -> ActiveModel {
+        ActiveModel::from(dto)
     }
 }

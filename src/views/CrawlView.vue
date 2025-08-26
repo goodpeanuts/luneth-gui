@@ -55,6 +55,21 @@
         </div>
       </div>
 
+      <!-- Image Download Option -->
+      <div v-if="taskType" class="image-option-section">
+        <h3 class="section-title">Image Options</h3>
+        <label class="image-option" :class="{ active: withImage }">
+          <input type="checkbox" v-model="withImage" :disabled="isProcessing" />
+          <div class="option-content">
+            <div class="option-icon">🖼️</div>
+            <div class="option-text">
+              <h4>Download Images</h4>
+              <p>Download cover and sample images to local storage</p>
+            </div>
+          </div>
+        </label>
+      </div>
+
       <!-- Action Section -->
       <div v-if="taskType" class="action-section">
         <button class="launch-btn" :class="{
@@ -100,6 +115,7 @@ import ProgressTracker from '@/components/ProgressTracker.vue';
 
 const urlInput = ref('');
 const codesInput = ref('');
+const withImage = ref(true); // 默认下载图片
 const isProcessing = ref(false);
 const errorMessage = ref('');
 const successMessage = ref('');
@@ -142,7 +158,7 @@ watch(taskType, (newType) => {
 });
 
 // 监听输入变化，清空错误信息
-watch([urlInput, codesInput], () => {
+watch([urlInput, codesInput, withImage], () => {
   errorMessage.value = '';
   successMessage.value = '';
 });
@@ -176,7 +192,10 @@ async function handleLaunch() {
 
   try {
     if (taskType.value === 'auto') {
-      await invoke('launch_auto_scrap_task', { url: urlInput.value.trim() });
+      await invoke('launch_auto_scrap_task', { 
+        url: urlInput.value.trim(), 
+        with_image: withImage.value 
+      });
       successMessage.value = 'Auto scraping task completed!';
     } else {
       const codes = codesInput.value
@@ -184,7 +203,10 @@ async function handleLaunch() {
         .map(line => line.trim())
         .filter(line => line !== '');
 
-      await invoke('launch_manual_scrap_task', { codes });
+      await invoke('launch_manual_scrap_task', { 
+        codes, 
+        with_image: withImage.value 
+      });
       successMessage.value = `Manual scraping task completed. Processed ${codes.length} codes.`;
     }
   } catch (error) {
@@ -299,6 +321,36 @@ async function handleLaunch() {
 
 .input-section {
   margin-bottom: 32px;
+}
+
+.image-option-section {
+  margin-bottom: 32px;
+}
+
+.image-option {
+  border: 2px solid #e9ecef;
+  border-radius: 12px;
+  padding: 20px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  display: block;
+  max-width: 500px;
+  margin: 0 auto;
+}
+
+.image-option:hover {
+  border-color: #28a745;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(40, 167, 69, 0.1);
+}
+
+.image-option.active {
+  border-color: #28a745;
+  background-color: #f8fff8;
+}
+
+.image-option input[type="checkbox"] {
+  display: none;
 }
 
 .url-input,
