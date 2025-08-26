@@ -4,8 +4,7 @@ mod db {
     pub mod write;
 }
 mod common;
-mod extract;
-mod scrap;
+mod handlers;
 mod command {
     pub mod client;
     pub mod extract;

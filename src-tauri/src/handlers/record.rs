@@ -4,7 +4,7 @@ use luneth_db::{DbOperator, DbService};
 use serde::Serialize;
 use tauri::{AppHandle, Emitter as _};
 
-use crate::{common::new_postman, db::write::save_remote_records, scrap::TaskType, AppError};
+use crate::{common::new_postman, db::write::save_remote_records, handlers::TaskType, AppError};
 
 impl super::Task {
     pub async fn new_pull_record_slim(

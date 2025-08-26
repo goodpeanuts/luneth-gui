@@ -7,7 +7,7 @@ use tauri::State;
 use url::Url;
 
 use crate::db::read::{get_op_history, get_records};
-use crate::scrap::{Task, TASK_BASE_URL};
+use crate::handlers::{Task, TASK_BASE_URL};
 use crate::AppState;
 
 // ############

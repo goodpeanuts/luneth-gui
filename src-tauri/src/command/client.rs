@@ -5,7 +5,7 @@ use tauri::State;
 use url::Url;
 
 use crate::common::{ClientAuth, CLIENT_AUTH};
-use crate::scrap::Task;
+use crate::handlers::Task;
 use crate::AppState;
 
 // ############

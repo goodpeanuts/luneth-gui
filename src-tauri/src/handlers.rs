@@ -8,10 +8,10 @@ use tokio::sync::Mutex;
 use crate::AppError;
 
 mod auto;
+mod batch;
 mod idol;
 mod images;
 mod record;
-mod specified;
 
 pub static TASK_BASE_URL: LazyLock<Mutex<Option<String>>> = LazyLock::new(|| {
     Mutex::new(None) // Default base URL
@@ -23,7 +23,7 @@ pub enum TaskType {
     Auto(String, bool),
 
     // List of specified codes, and with image
-    Manual(Vec<String>, bool),
+    Batch(Vec<String>, bool),
 
     // Pull remote records
     PullRemote,
@@ -70,10 +70,10 @@ impl Task {
                 log::debug!("Executing auto crawl task for URL: {url}");
                 self.crawl_auto(url, *with_image).await
             }
-            TaskType::Manual(codes, with_image) => {
+            TaskType::Batch(codes, with_image) => {
                 self.crawler = self.crawler.start().await?;
                 log::debug!("Executing manual crawl task for {} codes", codes.len());
-                self.crawl_manual(codes, *with_image).await
+                self.crawl_batch(codes, *with_image).await
             }
             TaskType::Idol => {
                 self.crawler = self.crawler.start().await?;

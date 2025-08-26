@@ -7,8 +7,8 @@ use serde::Serialize;
 use tauri::{AppHandle, Emitter as _};
 
 use crate::db::log::{log_failed_op, log_success_op};
-use crate::scrap::images::crawl_record_image;
-use crate::scrap::TaskType;
+use crate::handlers::images::crawl_record_image;
+use crate::handlers::TaskType;
 use crate::AppError;
 use luneth_db::entities::record_local::Model as RecorderModel;
 use luneth_db::{DbOperator, DbService, OperationType};
@@ -24,7 +24,7 @@ impl super::Task {
             "Creating new manual scraping task for {} codes",
             codes.len()
         );
-        let task_type = TaskType::Manual(codes, with_image);
+        let task_type = TaskType::Batch(codes, with_image);
         let crawler = Self::new_crawler().await?;
         log::debug!("Manual scraping task created successfully");
         Ok(Self {
@@ -35,7 +35,7 @@ impl super::Task {
         })
     }
 
-    pub(super) async fn crawl_manual(
+    pub(super) async fn crawl_batch(
         &self,
         codes: &[String],
         with_image: bool,

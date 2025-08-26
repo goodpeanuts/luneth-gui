@@ -5,7 +5,7 @@ use luneth_db::DbOperator;
 use serde::Serialize;
 use tauri::{AppHandle, Emitter as _};
 
-use crate::{common::new_postman, scrap::TaskType, AppError};
+use crate::{common::new_postman, handlers::TaskType, AppError};
 
 impl super::Task {
     pub async fn new_idol(app_handle: AppHandle, db: Arc<DbOperator>) -> Result<Self, AppError> {

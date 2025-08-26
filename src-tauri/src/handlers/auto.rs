@@ -6,7 +6,7 @@ use tauri::{AppHandle, Emitter as _};
 
 use crate::{
     db::log::{log_failed_op, log_success_op},
-    scrap::{AppError, TaskType},
+    handlers::{AppError, TaskType},
 };
 use luneth_db::{DbOperator, DbService, OperationType};
 
@@ -97,7 +97,7 @@ async fn auto_crawl_page(
             break;
         }
 
-        super::specified::crawl_codes(app_handle, db, crawler, &record_ids, with_image).await?;
+        super::batch::crawl_codes(app_handle, db, crawler, &record_ids, with_image).await?;
         // crawl_page_finished(page_i);
         log::info!(
             "Successfully crawled page: {url}, found {} records",
