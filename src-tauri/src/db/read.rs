@@ -49,10 +49,8 @@ pub(crate) async fn get_exist_record_ids(db: &impl DbService) -> Result<Vec<Stri
     log::debug!("Querying all existing record IDs from database");
     let remote_ids = get_remote_record_id(db).await?;
     let local_ids = get_local_record_id(db).await?;
-    let exist_ids: Vec<String> = remote_ids
-        .into_iter()
-        .filter(|id| local_ids.contains(id))
-        .collect();
+    let mut exist_ids: Vec<String> = remote_ids;
+    exist_ids.extend(local_ids);
     log::debug!(
         "Successfully retrieved {} existing record IDs",
         exist_ids.len()

@@ -66,7 +66,7 @@ where
     let mut success_count = 0;
     let mut error_count = 0;
 
-    let exist =  EXIST_IDS.write().await.fresh(db).await; 
+    let exist = EXIST_IDS.write().await.fresh(db).await;
 
     let exist_records = match exist {
         Ok(()) => EXIST_IDS.read().await.ids.clone(),
@@ -83,6 +83,13 @@ where
         let code = code.as_ref();
         if exist_records.contains(&code.to_owned()) {
             log::debug!("skip, {code} already exist");
+            report_crawl_code_result(
+                app_handle,
+                code,
+                CrawlStatus::Exist,
+                "Record already exists".to_owned(),
+            );
+            success_count += 1;
             continue;
         }
 
@@ -174,6 +181,7 @@ where
 enum CrawlStatus {
     Success,
     Failed,
+    Exist,
 }
 
 // Progress events for code crawling
