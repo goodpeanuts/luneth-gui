@@ -66,7 +66,9 @@ where
     let mut success_count = 0;
     let mut error_count = 0;
 
-    let exist_records = match EXIST_IDS.write().await.fresh(db).await {
+    let exist =  EXIST_IDS.write().await.fresh(db).await; 
+
+    let exist_records = match exist {
         Ok(()) => EXIST_IDS.read().await.ids.clone(),
         Err(e) => {
             log::error!("Failed to refresh existing record IDs: {e}");
@@ -74,8 +76,8 @@ where
         }
     };
 
-    // Send initial progress event for manual mode
-    report_crawl_manual_start(app_handle, codes.len());
+    // Send initial progress event - unified batch crawl start
+    report_batch_crawl_start(app_handle, codes.len());
 
     for code in codes {
         let code = code.as_ref();
@@ -177,6 +179,12 @@ enum CrawlStatus {
 // Progress events for code crawling
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
+struct BatchCrawlStartEvent {
+    pub total_count: usize,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
 struct CrawlCodeReportEvent {
     pub code: String,
     pub status: CrawlStatus,
@@ -192,13 +200,11 @@ struct CrawlCodesFinishedEvent {
 }
 
 // Event emission helper functions
-fn report_crawl_manual_start(app_handle: &AppHandle, total_count: usize) {
-    let event = serde_json::json!({
-        "totalCount": total_count
-    });
-    match app_handle.emit("crawl-manual-start", &event) {
-        Ok(_) => log::debug!("Emitted crawl-manual-start event with {total_count} codes"),
-        Err(e) => log::error!("Failed to emit crawl-manual-start event: {e}"),
+fn report_batch_crawl_start(app_handle: &AppHandle, total_count: usize) {
+    let event = BatchCrawlStartEvent { total_count };
+    match app_handle.emit("batch-crawl-start", &event) {
+        Ok(_) => log::debug!("Emitted batch-crawl-start event with {total_count} codes"),
+        Err(e) => log::error!("Failed to emit batch-crawl-start event: {e}"),
     }
 }
 

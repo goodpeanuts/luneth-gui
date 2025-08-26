@@ -45,7 +45,7 @@ export type {
   CrawlPageFailedEvent,
   CrawlCodeReportEvent,
   CrawlCodesFinishedEvent,
-  CrawlManualStartEvent,
+  BatchCrawlStartEvent,
   IdolCrawlStartEvent,
   IdolCrawlProgressEvent,
   IdolCrawlCompleteEvent,
@@ -53,5 +53,9 @@ export type {
   RecordPullStartEvent,
   RecordPullProgressEvent,
   RecordPullCompleteEvent,
-  RecordPullFailedEvent
+  RecordPullFailedEvent,
+  SubmitStartEvent,
+  SubmitCodeStartEvent,
+  SubmitCodeResultEvent,
+  SubmitFinishedEvent
 } from './events';

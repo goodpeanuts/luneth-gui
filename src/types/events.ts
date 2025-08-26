@@ -27,7 +27,7 @@ export interface CrawlCodesFinishedEvent {
   totalCount: number;
 }
 
-export interface CrawlManualStartEvent {
+export interface BatchCrawlStartEvent {
   totalCount: number;
 }
 
@@ -38,38 +38,34 @@ export interface IdolCrawlStartEvent {
 
 export interface IdolCrawlProgressEvent {
   processed: number;
-  total: number;
   message: string;
 }
 
 export interface IdolCrawlCompleteEvent {
-  total: number;
-  successful: number;
-  message: string;
+  successCount: number;
+  totalCount: number;
 }
 
 export interface IdolCrawlFailedEvent {
-  error: string;
+  errorMessage: string;
 }
 
 export interface RecordPullStartEvent {
-  message: string;
+  totalCount: number;
 }
 
 export interface RecordPullProgressEvent {
   processed: number;
-  total: number;
   message: string;
 }
 
 export interface RecordPullCompleteEvent {
-  total: number;
-  newCount: number;
-  message: string;
+  successCount: number;
+  totalCount: number;
 }
 
 export interface RecordPullFailedEvent {
-  error: string;
+  errorMessage: string;
 }
 
 // 提交任务事件接口

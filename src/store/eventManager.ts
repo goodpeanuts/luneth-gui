@@ -7,7 +7,7 @@ import type {
   CrawlPageFailedEvent,
   CrawlCodeReportEvent,
   CrawlCodesFinishedEvent,
-  CrawlManualStartEvent,
+  BatchCrawlStartEvent,
   IdolCrawlStartEvent,
   IdolCrawlProgressEvent,
   IdolCrawlCompleteEvent,
@@ -52,22 +52,13 @@ export async function initializeGlobalEventListeners() {
     // 爬取相关事件监听
     // =================================
 
-    // Manual mode start
-    const unlistenManualStart = await listen<CrawlManualStartEvent>('crawl-manual-start', (event) => {
-      console.log('[Event] Manual crawl started:', event.payload);
+    // Batch crawl start (unified event for all batch operations)
+    const unlistenBatchStart = await listen<BatchCrawlStartEvent>('batch-crawl-start', (event) => {
+      console.log('[Event] Batch crawl started:', event.payload);
 
-      // 使用全局任务类型来判断是否是纯manual模式
-      const isManualMode = scrapTaskState.taskType === 'manual';
-
-      if (isManualMode) {
-        // 纯manual模式：清空所有进度条并创建新的
-        resetProgress();
-        const progress = findOrCreateProgress('Manual Crawl');
-        progress.total = event.payload.totalCount;
-        progress.current = 0;
-        progress.status = 'in-progress';
-      } else {
-        // Auto模式中的manual步骤：不重置进度条，更新最新的页面进度条
+      // 根据当前任务类型决定如何处理
+      if (scrapTaskState.taskType === 'auto') {
+        // Auto模式：更新最新的页面进度条
         const latestPageProgress = progressState.progressList
           .filter(p => p.name !== 'Manual Crawl')
           .sort((a, b) => b.createdAt - a.createdAt)[0];
@@ -77,9 +68,16 @@ export async function initializeGlobalEventListeners() {
           latestPageProgress.current = 0;
           latestPageProgress.status = 'in-progress';
         }
+      } else {
+        // Manual模式：清空所有进度条并创建新的
+        resetProgress();
+        const progress = findOrCreateProgress('Manual Crawl');
+        progress.total = event.payload.totalCount;
+        progress.current = 0;
+        progress.status = 'in-progress';
       }
     });
-    unlistenFunctions.push(unlistenManualStart);
+    unlistenFunctions.push(unlistenBatchStart);
 
     // Page start (auto mode)
     const unlistenPageStart = await listen<CrawlPageStartEvent>('crawl-page-start', (event) => {
@@ -187,7 +185,7 @@ export async function initializeGlobalEventListeners() {
       console.log('[Event] Idol crawl progress:', event.payload);
       updateTaskProgress('idolCrawl', {
         processed: event.payload.processed,
-        total: event.payload.total
+        total: -1 // Unknown total for progress events
       });
       updateTaskMessage('idolCrawl', event.payload.message);
     });
@@ -196,14 +194,14 @@ export async function initializeGlobalEventListeners() {
     const unlistenIdolComplete = await listen<IdolCrawlCompleteEvent>('idol-crawl-complete', (event) => {
       console.log('[Event] Idol crawl completed:', event.payload);
       updateTaskStatus('idolCrawl', 'success');
-      updateTaskMessage('idolCrawl', event.payload.message);
+      updateTaskMessage('idolCrawl', `Completed: ${event.payload.successCount}/${event.payload.totalCount} successful`);
     });
     unlistenFunctions.push(unlistenIdolComplete);
 
     const unlistenIdolFailed = await listen<IdolCrawlFailedEvent>('idol-crawl-failed', (event) => {
       console.log('[Event] Idol crawl failed:', event.payload);
       updateTaskStatus('idolCrawl', 'failed');
-      updateTaskMessage('idolCrawl', event.payload.error);
+      updateTaskMessage('idolCrawl', event.payload.errorMessage);
     });
     unlistenFunctions.push(unlistenIdolFailed);
 
@@ -211,7 +209,7 @@ export async function initializeGlobalEventListeners() {
     const unlistenRecordStart = await listen<RecordPullStartEvent>('record-pull-start', (event) => {
       console.log('[Event] Record pull started:', event.payload);
       updateTaskStatus('recordPull', 'running');
-      updateTaskMessage('recordPull', event.payload.message);
+      updateTaskMessage('recordPull', `Starting to pull ${event.payload.totalCount} records`);
     });
     unlistenFunctions.push(unlistenRecordStart);
 
@@ -219,7 +217,7 @@ export async function initializeGlobalEventListeners() {
       console.log('[Event] Record pull progress:', event.payload);
       updateTaskProgress('recordPull', {
         processed: event.payload.processed,
-        total: event.payload.total
+        total: -1 // Unknown total for progress events
       });
       updateTaskMessage('recordPull', event.payload.message);
     });
@@ -228,14 +226,14 @@ export async function initializeGlobalEventListeners() {
     const unlistenRecordComplete = await listen<RecordPullCompleteEvent>('record-pull-complete', (event) => {
       console.log('[Event] Record pull completed:', event.payload);
       updateTaskStatus('recordPull', 'success');
-      updateTaskMessage('recordPull', event.payload.message);
+      updateTaskMessage('recordPull', `Completed: ${event.payload.successCount}/${event.payload.totalCount} successful`);
     });
     unlistenFunctions.push(unlistenRecordComplete);
 
     const unlistenRecordFailed = await listen<RecordPullFailedEvent>('record-pull-failed', (event) => {
       console.log('[Event] Record pull failed:', event.payload);
       updateTaskStatus('recordPull', 'failed');
-      updateTaskMessage('recordPull', event.payload.error);
+      updateTaskMessage('recordPull', event.payload.errorMessage);
     });
     unlistenFunctions.push(unlistenRecordFailed);
 
