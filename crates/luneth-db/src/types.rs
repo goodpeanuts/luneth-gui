@@ -33,13 +33,6 @@ impl From<tauri::Error> for DbError {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct DownLink {
-    pub name: String,
-    pub link: String,
-    pub size: String,
-}
-
 /// 操作类型枚举
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum OperationType {

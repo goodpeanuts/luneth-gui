@@ -111,7 +111,9 @@ async fn auto_crawl_page(
     Ok(())
 }
 
-// event report
+// ################
+// # Report Events
+// ###############
 
 // Progress events for page crawling (auto mode)
 #[derive(Debug, Clone, Serialize)]

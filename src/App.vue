@@ -69,8 +69,8 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
-import { appState, navigateTo } from '@/store';
+import { computed, onMounted, onUnmounted } from 'vue';
+import { appState, navigateTo, initializeGlobalEventListeners, cleanupEventListeners } from '@/store';
 
 // Components
 import HomeView from '@/views/HomeView.vue';
@@ -95,6 +95,18 @@ const viewComponents = {
 // Current view component
 const currentViewComponent = computed(() => {
   return viewComponents[appState.currentView] || HomeView;
+});
+
+// 初始化全局事件监听
+onMounted(async () => {
+  console.log('[App] Initializing global event listeners');
+  await initializeGlobalEventListeners();
+});
+
+// 清理事件监听
+onUnmounted(() => {
+  console.log('[App] Cleaning up global event listeners');
+  cleanupEventListeners();
 });
 </script>
 

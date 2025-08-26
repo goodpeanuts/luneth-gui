@@ -148,6 +148,10 @@ where
     Ok(())
 }
 
+// ################
+// # Report Events
+// ###############
+
 // Progress status for crawl operations
 #[derive(Debug, Clone, Copy, Serialize)]
 #[serde(rename_all = "camelCase")]

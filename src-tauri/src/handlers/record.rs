@@ -72,6 +72,10 @@ async fn pull_record_slim(app_handle: &AppHandle, db: &impl DbService) -> Result
     Ok(())
 }
 
+// ################
+// # Report Events
+// ###############
+
 // Record pull events
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]

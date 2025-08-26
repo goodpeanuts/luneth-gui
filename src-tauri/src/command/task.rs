@@ -1,55 +1,13 @@
 #![expect(clippy::let_underscore_must_use)]
 
-use std::sync::Arc;
-
-use luneth_db::entities::record_local::Model as RecorderModel;
-use tauri::State;
-use url::Url;
-
-use crate::db::read::{get_op_history, get_records};
-use crate::handlers::{Task, TASK_BASE_URL};
+use crate::handlers::Task;
 use crate::AppState;
+use std::sync::Arc;
+use tauri::State;
 
 // ############
 // # scraping
 // #############
-
-#[tauri::command(rename_all = "snake_case")]
-pub async fn set_task_base_url(mut url: String) -> Result<(), String> {
-    // Ensure the URL ends with /
-    if url.is_empty() {
-        log::info!("Task base URL reset");
-    } else if !url.ends_with('/') {
-        url.push('/');
-    }
-    Url::parse(&url).map_err(|e| format!("Invalid URL: {e}"))?;
-
-    log::info!("Setting task base URL to: {url}");
-    *TASK_BASE_URL.lock().await = Some(url);
-    Ok(())
-}
-
-#[tauri::command(rename_all = "snake_case")]
-pub async fn get_all_records(
-    state: State<'_, Arc<AppState>>,
-) -> Result<Vec<RecorderModel>, String> {
-    log::debug!("Fetching all records from database");
-    let db = Arc::clone(&state.db);
-    let records = get_records(db.as_ref()).await.map_err(|e| e.clone())?;
-    log::info!("Retrieved {} records from database", records.len());
-    Ok(records)
-}
-
-#[tauri::command(rename_all = "snake_case")]
-pub async fn get_all_op_history(
-    state: State<'_, Arc<AppState>>,
-) -> Result<Vec<luneth_db::history_op::Model>, String> {
-    log::debug!("Fetching operation history from database");
-    let db = Arc::clone(&state.db);
-    let history = get_op_history(db.as_ref()).await.map_err(|e| e.clone())?;
-    log::info!("Retrieved {} operation history records", history.len());
-    Ok(history)
-}
 
 #[tauri::command(rename_all = "snake_case")]
 pub async fn launch_auto_scrap_task(

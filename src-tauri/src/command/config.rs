@@ -6,7 +6,27 @@ use url::Url;
 
 use crate::common::{ClientAuth, CLIENT_AUTH};
 use crate::handlers::Task;
+use crate::handlers::TASK_BASE_URL;
 use crate::AppState;
+
+// ############
+// # Base Url
+// #############
+
+#[tauri::command(rename_all = "snake_case")]
+pub async fn set_task_base_url(mut url: String) -> Result<(), String> {
+    // Ensure the URL ends with /
+    if url.is_empty() {
+        log::info!("Task base URL reset");
+    } else if !url.ends_with('/') {
+        url.push('/');
+    }
+    Url::parse(&url).map_err(|e| format!("Invalid URL: {e}"))?;
+
+    log::info!("Setting task base URL to: {url}");
+    *TASK_BASE_URL.lock().await = Some(url);
+    Ok(())
+}
 
 // ############
 // # client

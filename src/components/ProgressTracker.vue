@@ -38,49 +38,20 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, onUnmounted } from 'vue';
-import { listen } from '@tauri-apps/api/event';
+import { onMounted } from 'vue';
 import {
   progressState,
-  scrapTaskState,
-  findOrCreateProgress,
-  updateProgressStatus,
+  showProgress as showProgressGlobal,
   resetProgress
 } from '@/store';
 import type { ProgressStatus, ProgressItem } from '@/types';
 
-// Event interfaces
-interface CrawlPageStartEvent {
-  pageName: string;
-}
-
-interface CrawlPageSuccessEvent {
-  pageName: string;
-  totalCount: number;
-}
-
-interface CrawlPageFailedEvent {
-  pageName: string;
-  errorMessage: string;
-}
-
-interface CrawlCodeReportEvent {
-  code: string;
-  status: 'Success' | 'Failed';
-  message: string;
-}
-
-interface CrawlCodesFinishedEvent {
-  successCount: number;
-  errorCount: number;
-  totalCount: number;
-}
-
-interface CrawlManualStartEvent {
-  totalCount: number;
-}
-
-let unlistenFunctions: (() => void)[] = [];
+// 在组件挂载时，如果有进度数据就显示进度组件
+onMounted(() => {
+  if (progressState.progressList.length > 0) {
+    showProgressGlobal();
+  }
+});
 
 // Get status class for styling
 const getStatusClass = (status: ProgressStatus): string => {
@@ -166,127 +137,6 @@ const truncateMessage = (message: string): string => {
   const maxLength = 80;
   return message.length > maxLength ? `${message.substring(0, maxLength)}...` : message;
 };
-
-// Set up event listeners
-onMounted(async () => {
-  try {
-    // Manual mode start
-    const unlistenManualStart = await listen<CrawlManualStartEvent>('crawl-manual-start', (event) => {
-      // 使用全局任务类型来判断是否是纯manual模式
-      const isManualMode = scrapTaskState.taskType === 'manual';
-
-      if (isManualMode) {
-        // 纯manual模式：清空所有进度条并创建新的
-        resetProgress();
-        const progress = findOrCreateProgress('Manual Crawl');
-        progress.total = event.payload.totalCount;
-        progress.current = 0;
-        progress.status = 'in-progress';
-      } else {
-        // Auto模式中的manual步骤：不重置进度条，更新最新的页面进度条
-        const latestPageProgress = progressState.progressList
-          .filter((p: ProgressItem) => p.name !== 'Manual Crawl')
-          .sort((a: ProgressItem, b: ProgressItem) => b.createdAt - a.createdAt)[0];
-
-        if (latestPageProgress) {
-          latestPageProgress.total = event.payload.totalCount;
-          latestPageProgress.current = 0;
-          latestPageProgress.status = 'in-progress';
-        }
-      }
-    });
-    unlistenFunctions.push(unlistenManualStart);
-
-    // Page start (auto mode) - 新页面应该在顶部创建
-    const unlistenPageStart = await listen<CrawlPageStartEvent>('crawl-page-start', (event) => {
-      const progress = findOrCreateProgress(event.payload.pageName);
-      progress.status = 'pending';
-      progress.total = -1; // Unknown total initially
-      progress.current = 0;
-    });
-    unlistenFunctions.push(unlistenPageStart);
-
-    // Page success (auto mode)
-    const unlistenPageSuccess = await listen<CrawlPageSuccessEvent>('crawl-page-success', (event) => {
-      const progress = findOrCreateProgress(event.payload.pageName);
-      progress.total = event.payload.totalCount;
-      progress.status = 'in-progress';
-    });
-    unlistenFunctions.push(unlistenPageSuccess);
-
-    // Page failed (auto mode)
-    const unlistenPageFailed = await listen<CrawlPageFailedEvent>('crawl-page-failed', (event) => {
-      const progress = findOrCreateProgress(event.payload.pageName);
-      progress.status = 'failed';
-      progress.errorMessage = event.payload.errorMessage;
-    });
-    unlistenFunctions.push(unlistenPageFailed);
-
-    // Code report (both modes)
-    const unlistenCodeReport = await listen<CrawlCodeReportEvent>('crawl-code-report', (_event) => {
-      // Find the appropriate progress bar to update
-      let targetProgress: ProgressItem | undefined;
-
-      if (scrapTaskState.taskType === 'auto') {
-        // Auto模式：更新最新的in-progress页面进度条
-        const autoModeProgresses = progressState.progressList.filter((p: ProgressItem) => p.name !== 'Manual Crawl');
-        targetProgress = autoModeProgresses
-          .filter((p: ProgressItem) => p.status === 'in-progress')
-          .sort((a: ProgressItem, b: ProgressItem) => b.createdAt - a.createdAt)[0];
-      } else {
-        // Manual模式：更新Manual Crawl进度条
-        targetProgress = progressState.progressList.find((p: ProgressItem) => p.name === 'Manual Crawl');
-      }
-
-      if (targetProgress) {
-        targetProgress.current++;
-        updateProgressStatus(targetProgress);
-      }
-    });
-    unlistenFunctions.push(unlistenCodeReport);
-
-    // Codes finished
-    const unlistenCodesFinished = await listen<CrawlCodesFinishedEvent>('crawl-codes-finished', (event) => {
-      // Find the progress to update
-      let targetProgress: ProgressItem | undefined;
-
-      if (scrapTaskState.taskType === 'auto') {
-        // Auto模式：更新最新的in-progress页面进度条
-        const autoModeProgresses = progressState.progressList.filter((p: ProgressItem) => p.name !== 'Manual Crawl');
-        targetProgress = autoModeProgresses
-          .filter((p: ProgressItem) => p.status === 'in-progress')
-          .sort((a: ProgressItem, b: ProgressItem) => b.createdAt - a.createdAt)[0];
-      } else {
-        // Manual模式：更新Manual Crawl进度条
-        targetProgress = progressState.progressList.find((p: ProgressItem) => p.name === 'Manual Crawl');
-      }
-
-      if (targetProgress) {
-        const { successCount, errorCount, totalCount } = event.payload;
-        targetProgress.current = totalCount;
-        targetProgress.total = totalCount;
-
-        if (errorCount === 0) {
-          targetProgress.status = 'success';
-        } else if (successCount === 0) {
-          targetProgress.status = 'failed';
-        } else {
-          targetProgress.status = 'mixed';
-        }
-      }
-    });
-    unlistenFunctions.push(unlistenCodesFinished);
-
-  } catch (error) {
-    console.error('Failed to set up progress listeners:', error);
-  }
-});
-
-// Clean up event listeners
-onUnmounted(() => {
-  unlistenFunctions.forEach(unlisten => unlisten());
-  unlistenFunctions = [];
-});
 
 // Expose reset function for parent component
 defineExpose({

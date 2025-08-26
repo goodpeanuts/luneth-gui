@@ -106,6 +106,10 @@ impl super::Task {
     }
 }
 
+// ################
+// # Report Events
+// ###############
+
 // Idol crawl events
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
