@@ -11,6 +11,7 @@ mod idol;
 mod images;
 mod record;
 mod submit;
+mod update;
 
 #[derive(Debug)]
 pub enum TaskType {
@@ -27,6 +28,8 @@ pub enum TaskType {
     Idol,
 
     Submit(Vec<String>),
+
+    Update(Vec<String>),
 }
 
 pub struct Task {
@@ -57,6 +60,10 @@ impl Task {
             TaskType::Submit(codes) => {
                 log::debug!("Executing submit crawl task for {} codes", codes.len());
                 self.submit_codes(codes).await
+            }
+            TaskType::Update(codes) => {
+                log::debug!("Executing update crawl task for {} codes", codes.len());
+                self.update_codes(codes).await
             }
         };
 

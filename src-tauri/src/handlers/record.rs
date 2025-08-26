@@ -7,18 +7,15 @@ use tauri::{AppHandle, Emitter as _};
 use crate::{common::new_postman, db::write::save_remote_records, handlers::TaskType, AppError};
 
 impl super::Task {
-    pub async fn new_pull_record_slim(
-        app_handle: AppHandle,
-        db: Arc<DbOperator>,
-    ) -> Result<Self, AppError> {
+    pub async fn new_pull_record_slim(app_handle: AppHandle, db: Arc<DbOperator>) -> Self {
         log::debug!("Creating new pull record slim task");
         let task_type = TaskType::PullRemote;
         log::debug!("Pull record slim task created successfully");
-        Ok(Self {
+        Self {
             db,
             app_handle,
             task_type,
-        })
+        }
     }
 
     pub(super) async fn pull_record_slim(&self) -> Result<(), AppError> {

@@ -151,6 +151,13 @@ impl Model {
         }
     }
 
+    pub fn set_local_image_cached(self, count: i32, cached_locally: bool) -> ActiveModel {
+        let mut active_model = self.into_active_model();
+        active_model.local_image_count = Set(count);
+        active_model.is_cached_locally = Set(cached_locally);
+        active_model
+    }
+
     pub fn set_viewd(self, viewed: bool) -> ActiveModel {
         let mut active_model = self.into_active_model();
         active_model.viewed = Set(viewed);
@@ -166,6 +173,12 @@ impl Model {
     pub fn set_submitted(self, submitted: bool) -> ActiveModel {
         let mut active_model = self.into_active_model();
         active_model.is_submitted = Set(submitted);
+        active_model
+    }
+
+    pub fn update_links(self, links: Vec<luneth::common::MagnetLink>) -> ActiveModel {
+        let mut active_model = self.into_active_model();
+        active_model.share_magnet_links = Set(serde_json::to_value(links).unwrap_or_default());
         active_model
     }
 }

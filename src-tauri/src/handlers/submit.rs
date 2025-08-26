@@ -20,13 +20,13 @@ impl super::Task {
         app_handle: AppHandle,
         db: Arc<DbOperator>,
         codes: Vec<String>,
-    ) -> Result<Self, AppError> {
+    ) -> Self {
         let task_type = TaskType::Submit(codes);
-        Ok(Self {
+        Self {
             db,
             task_type,
             app_handle,
-        })
+        }
     }
 
     #[expect(clippy::too_many_lines)]
