@@ -12,12 +12,10 @@ impl super::Task {
         db: Arc<DbOperator>,
     ) -> Result<Self, AppError> {
         log::debug!("Creating new pull record slim task");
-        let crawler = Self::new_crawler().await?;
         let task_type = TaskType::PullRemote;
         log::debug!("Pull record slim task created successfully");
         Ok(Self {
             db,
-            crawler,
             app_handle,
             task_type,
         })

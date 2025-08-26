@@ -5,23 +5,26 @@ use luneth_db::DbOperator;
 use serde::Serialize;
 use tauri::{AppHandle, Emitter as _};
 
-use crate::{common::new_postman, handlers::TaskType, AppError};
+use crate::{
+    common::{new_crawler, new_postman},
+    handlers::TaskType,
+    AppError,
+};
 
 impl super::Task {
     pub async fn new_idol(app_handle: AppHandle, db: Arc<DbOperator>) -> Result<Self, AppError> {
         log::debug!("Creating new idol scraping task ");
         let task_type = TaskType::Idol;
-        let crawler = Self::new_crawler().await?;
         log::debug!("Idol scraping task created successfully");
         Ok(Self {
             db,
             task_type,
-            crawler,
             app_handle,
         })
     }
 
     pub(super) async fn crawl_idol(&self) -> Result<(), AppError> {
+        let crawler = new_crawler().await?.start().await?;
         let mut client = new_postman().await?;
 
         let idol_without_image = client.get_idol_without_image().await.map_err(|e| {
@@ -48,7 +51,7 @@ impl super::Task {
         for (id, link) in idol_links {
             processed_count += 1;
 
-            let image = self.crawler.crawl_idol_image(link).await;
+            let image = crawler.crawl_idol_image(link).await;
 
             match image {
                 Ok(image) => {

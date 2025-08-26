@@ -28,7 +28,7 @@ use crate::command::{
     },
     task::{
         launch_auto_scrap_task, launch_idol_scrap_task, launch_manual_scrap_task,
-        launch_record_pull_task,
+        launch_record_pull_task, launch_submit_task,
     },
 };
 
@@ -143,7 +143,8 @@ pub fn run() {
             mark_record_liked,
             mark_record_unliked,
             launch_idol_scrap_task,
-            launch_record_pull_task
+            launch_record_pull_task,
+            launch_submit_task
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

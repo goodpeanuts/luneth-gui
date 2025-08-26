@@ -162,4 +162,10 @@ impl Model {
         active_model.is_liked = Set(liked);
         active_model
     }
+
+    pub fn set_submitted(self, submitted: bool) -> ActiveModel {
+        let mut active_model = self.into_active_model();
+        active_model.is_submitted = Set(submitted);
+        active_model
+    }
 }

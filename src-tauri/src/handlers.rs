@@ -1,9 +1,7 @@
-use std::sync::{Arc, LazyLock};
+use std::sync::Arc;
 
-use luneth::crawl::{self, crawler};
 use luneth_db::DbOperator;
 use tauri::AppHandle;
-use tokio::sync::Mutex;
 
 use crate::AppError;
 
@@ -12,10 +10,7 @@ mod batch;
 mod idol;
 mod images;
 mod record;
-
-pub static TASK_BASE_URL: LazyLock<Mutex<Option<String>>> = LazyLock::new(|| {
-    Mutex::new(None) // Default base URL
-});
+mod submit;
 
 #[derive(Debug)]
 pub enum TaskType {
@@ -30,57 +25,39 @@ pub enum TaskType {
 
     // Idol Link
     Idol,
+
+    Submit(Vec<String>),
 }
 
 pub struct Task {
     app_handle: AppHandle,
     db: Arc<DbOperator>,
     task_type: TaskType,
-    crawler: crawler::WebCrawler,
 }
 
 impl Task {
-    async fn new_crawler() -> Result<crawler::WebCrawler, AppError> {
-        log::debug!("Creating new web crawler");
-        let Some(base_url) = TASK_BASE_URL.lock().await.clone() else {
-            log::warn!("No base URL configured, using default crawler");
-            return crawl::WebCrawler::new().map_err(AppError::CrawlError);
-        };
-
-        log::debug!("Creating crawler with base URL: {base_url}");
-        let config = luneth::crawl::CrawlConfig {
-            base_url: base_url.clone(),
-            ..Default::default()
-        };
-        crawler::WebCrawler::with_config(config).map_err(AppError::CrawlError)
-    }
-
-    #[expect(unused)]
-    pub fn get_crawler(&self) -> &crawler::WebCrawler {
-        &self.crawler
-    }
-
-    pub async fn exec(mut self) -> Result<(), AppError> {
+    pub async fn exec(self) -> Result<(), AppError> {
         log::debug!("Starting task execution");
         log::debug!("Starting web crawler");
 
         let result = match &self.task_type {
             TaskType::Auto(url, with_image) => {
-                self.crawler = self.crawler.start().await?;
                 log::debug!("Executing auto crawl task for URL: {url}");
                 self.crawl_auto(url, *with_image).await
             }
             TaskType::Batch(codes, with_image) => {
-                self.crawler = self.crawler.start().await?;
                 log::debug!("Executing manual crawl task for {} codes", codes.len());
                 self.crawl_batch(codes, *with_image).await
             }
             TaskType::Idol => {
-                self.crawler = self.crawler.start().await?;
                 log::debug!("Executing idol crawl task");
                 self.crawl_idol().await
             }
             TaskType::PullRemote => self.pull_record_slim().await,
+            TaskType::Submit(codes) => {
+                log::debug!("Executing submit crawl task for {} codes", codes.len());
+                self.submit_codes(codes).await
+            }
         };
 
         match &result {

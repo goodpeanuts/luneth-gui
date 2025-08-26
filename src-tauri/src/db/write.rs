@@ -102,3 +102,27 @@ pub(crate) async fn mark_record_unliked(db: &impl DbService, code: &str) -> Resu
 
     Ok(())
 }
+
+pub(crate) async fn mark_record_submitted(db: &impl DbService, code: &str) -> Result<(), AppError> {
+    log::debug!("Marking record as submitted: {code}");
+    use luneth_db::entities::record_local::Entity as RecordLocal;
+
+    let record_local = db.find_record_local_by_id::<RecordLocal>(code).await?;
+
+    if let Some(record) = record_local {
+        let submitted_am = record.set_submitted(true);
+        db.update_record_local(submitted_am).await?;
+        super::log::log_success_op(db, OperationType::Submit, code).await?;
+    } else {
+        log::error!("Record with code {code} not found in local database");
+        super::log::log_failed_op(
+            db,
+            OperationType::Submit,
+            code,
+            "Record not found".to_owned(),
+        )
+        .await?;
+    }
+
+    Ok(())
+}

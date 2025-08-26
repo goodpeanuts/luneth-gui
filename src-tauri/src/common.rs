@@ -1,6 +1,6 @@
 use std::{path::PathBuf, sync::LazyLock};
 
-use luneth::client::Postman;
+use luneth::{client::Postman, crawl::WebCrawler};
 use luneth_db::DbService;
 use tauri::{AppHandle, Manager as _};
 use tokio::sync::{Mutex, RwLock};
@@ -59,4 +59,23 @@ pub async fn new_postman() -> Result<Postman, AppError> {
     };
     let client = Postman::new(&auth.url, auth.id, auth.secret);
     Ok(client)
+}
+
+pub static TASK_BASE_URL: LazyLock<Mutex<Option<String>>> = LazyLock::new(|| {
+    Mutex::new(None) // Default base URL
+});
+
+pub async fn new_crawler() -> Result<WebCrawler, AppError> {
+    log::debug!("Creating new web crawler");
+    let Some(base_url) = TASK_BASE_URL.lock().await.clone() else {
+        log::warn!("No base URL configured, using default crawler");
+        return WebCrawler::new().map_err(AppError::CrawlError);
+    };
+
+    log::debug!("Creating crawler with base URL: {base_url}");
+    let config = luneth::crawl::CrawlConfig {
+        base_url: base_url.clone(),
+        ..Default::default()
+    };
+    WebCrawler::with_config(config).map_err(AppError::CrawlError)
 }

@@ -85,19 +85,126 @@
             ⚠️ Configuration required
           </div>
         </div>
+
+        <!-- Submit Task -->
+        <div class="task-card">
+          <div class="task-header">
+            <h3 class="task-name">Submit Records</h3>
+            <div class="task-description">
+              Submit records to server based on conditions
+            </div>
+          </div>
+
+          <!-- Filter Options -->
+          <div class="filter-section">
+            <h4 class="filter-title">Filter Conditions:</h4>
+            <div class="filter-options">
+              <label class="filter-option">
+                <input
+                  type="checkbox"
+                  v-model="submitFilters.isLiked"
+                  @change="updateFilteredCount"
+                />
+                <span>Liked Records</span>
+              </label>
+
+              <label class="filter-option">
+                <input
+                  type="checkbox"
+                  v-model="submitFilters.isSubmitted"
+                  @change="updateFilteredCount"
+                />
+                <span>Already Submitted</span>
+              </label>
+
+              <label class="filter-option">
+                <input
+                  type="checkbox"
+                  v-model="submitFilters.hasLocalImages"
+                  @change="updateFilteredCount"
+                />
+                <span>Has Local Images</span>
+              </label>
+            </div>
+
+            <div class="filter-result">
+              <span v-if="filteredRecordsCount >= 0">
+                {{ filteredRecordsCount }} records match the criteria
+              </span>
+              <span v-else class="loading-text">
+                Loading records...
+              </span>
+            </div>
+          </div>
+
+          <div class="task-status">
+            <div class="status-container">
+              <div class="status-info">
+                <div class="status-line">{{ getStatusText('submit') }}</div>
+                <div v-if="manageTaskState.submit.message" class="status-message">
+                  {{ manageTaskState.submit.message }}
+                </div>
+                <div v-if="manageTaskState.submit.progress" class="status-progress">
+                  Progress: {{ manageTaskState.submit.progress.processed }}/{{ manageTaskState.submit.progress.total }}
+                </div>
+              </div>
+            </div>
+
+            <button
+              class="task-btn"
+              :class="{
+                disabled: !isConfigured || isAnyTaskRunning || filteredRecordsCount <= 0,
+                running: manageTaskState.submit.status === 'running'
+              }"
+              @click="startSubmitTask"
+              :disabled="!isConfigured || isAnyTaskRunning || filteredRecordsCount <= 0"
+            >
+              <span v-if="manageTaskState.submit.status === 'running'">Submitting...</span>
+              <span v-else>Submit Records ({{ filteredRecordsCount }})</span>
+            </button>
+          </div>
+
+          <div v-if="!isConfigured" class="config-warning">
+            ⚠️ Configuration required
+          </div>
+        </div>
       </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, ref, onMounted } from 'vue';
 import { invoke } from '@tauri-apps/api/core';
 import {
   manageTaskState,
   updateTaskStatus,
   updateTaskMessage
 } from '@/store';
+
+// 记录模型类型定义（简化版本）
+interface RecordLocal {
+  id: string;
+  title: string;
+  viewed: boolean;
+  is_liked: boolean;
+  is_submitted: boolean;
+  is_cached_locally: boolean;
+  local_image_count: number;
+}
+
+// 筛选条件
+const submitFilters = ref({
+  isLiked: false,
+  isSubmitted: false,
+  hasLocalImages: false,
+});
+
+// 所有记录
+const allRecords = ref<RecordLocal[]>([]);
+
+// 筛选后的记录数量
+const filteredRecordsCount = ref(-1);
 
 // Configuration check
 const isConfigured = computed(() => {
@@ -108,11 +215,12 @@ const isConfigured = computed(() => {
 
 const isAnyTaskRunning = computed(() => {
   return manageTaskState.idolCrawl.status === 'running' ||
-         manageTaskState.recordPull.status === 'running';
+         manageTaskState.recordPull.status === 'running' ||
+         manageTaskState.submit.status === 'running';
 });
 
 // Status text helper
-const getStatusText = (taskType: 'idolCrawl' | 'recordPull') => {
+const getStatusText = (taskType: 'idolCrawl' | 'recordPull' | 'submit') => {
   const status = manageTaskState[taskType].status;
   switch (status) {
     case 'idle':
@@ -126,6 +234,51 @@ const getStatusText = (taskType: 'idolCrawl' | 'recordPull') => {
     default:
       return 'Unknown';
   }
+};
+
+// 获取所有记录
+const fetchAllRecords = async () => {
+  try {
+    allRecords.value = await invoke<RecordLocal[]>('get_all_records');
+    updateFilteredCount();
+  } catch (error) {
+    console.error('Failed to fetch records:', error);
+    allRecords.value = [];
+    filteredRecordsCount.value = 0;
+  }
+};
+
+// 更新筛选后的记录数量
+const updateFilteredCount = () => {
+  if (allRecords.value.length === 0) {
+    filteredRecordsCount.value = 0;
+    return;
+  }
+
+  let filtered = allRecords.value;
+
+  // 如果选择了喜欢的记录
+  if (submitFilters.value.isLiked) {
+    filtered = filtered.filter(record => record.is_liked);
+  }
+
+  // 如果选择了已提交的记录
+  if (submitFilters.value.isSubmitted) {
+    filtered = filtered.filter(record => record.is_submitted);
+  }
+
+  // 如果选择了有本地图片的记录
+  if (submitFilters.value.hasLocalImages) {
+    filtered = filtered.filter(record => record.is_cached_locally && record.local_image_count > 0);
+  }
+
+  // 如果没有选择任何筛选条件，返回0
+  if (!submitFilters.value.isLiked && !submitFilters.value.isSubmitted && !submitFilters.value.hasLocalImages) {
+    filteredRecordsCount.value = 0;
+    return;
+  }
+
+  filteredRecordsCount.value = filtered.length;
 };
 
 // Task actions
@@ -154,6 +307,41 @@ const startRecordPull = async () => {
     updateTaskMessage('recordPull', `Error: ${error}`);
   }
 };
+
+const startSubmitTask = async () => {
+  if (!isConfigured.value || isAnyTaskRunning.value || filteredRecordsCount.value <= 0) return;
+
+  try {
+    // 获取符合条件的记录ID
+    let filtered = allRecords.value;
+
+    if (submitFilters.value.isLiked) {
+      filtered = filtered.filter(record => record.is_liked);
+    }
+
+    if (submitFilters.value.isSubmitted) {
+      filtered = filtered.filter(record => record.is_submitted);
+    }
+
+    if (submitFilters.value.hasLocalImages) {
+      filtered = filtered.filter(record => record.is_cached_locally && record.local_image_count > 0);
+    }
+
+    const recordIds = filtered.map(record => record.id);
+
+    updateTaskStatus('submit', 'running');
+    await invoke('launch_submit_task', { codes: recordIds });
+  } catch (error) {
+    console.error('Failed to start submit task:', error);
+    updateTaskStatus('submit', 'failed');
+    updateTaskMessage('submit', `Error: ${error}`);
+  }
+};
+
+// 初始化时获取记录
+onMounted(() => {
+  fetchAllRecords();
+});
 </script>
 
 <style scoped>
@@ -212,6 +400,59 @@ const startRecordPull = async () => {
   color: #6c757d;
   font-size: 0.9rem;
   line-height: 1.4;
+}
+
+.filter-section {
+  background: #f8f9fa;
+  border-radius: 6px;
+  padding: 1rem;
+  margin-bottom: 1rem;
+  border: 1px solid #e9ecef;
+}
+
+.filter-title {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #495057;
+  margin: 0 0 0.75rem 0;
+}
+
+.filter-options {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.filter-option {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  font-size: 0.9rem;
+  color: #495057;
+}
+
+.filter-option input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+}
+
+.filter-result {
+  padding: 0.5rem;
+  background: #ffffff;
+  border-radius: 4px;
+  border: 1px solid #dee2e6;
+  font-size: 0.85rem;
+  color: #28a745;
+  font-weight: 500;
+  text-align: center;
+}
+
+.loading-text {
+  color: #6c757d !important;
+  font-style: italic;
 }
 
 .task-status {

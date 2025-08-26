@@ -23,6 +23,9 @@ export const manageTaskState = reactive<ManageTasksState>({
   recordPull: {
     status: 'idle',
   },
+  submit: {
+    status: 'idle',
+  },
 });
 
 // 重置爬取任务状态
@@ -33,7 +36,7 @@ export function resetScrapTaskState() {
 }
 
 // 管理任务状态管理函数
-export function setManageTaskStatus(taskType: 'idolCrawl' | 'recordPull', status: ManageTaskStatus) {
+export function setManageTaskStatus(taskType: 'idolCrawl' | 'recordPull' | 'submit', status: ManageTaskStatus) {
   const task = manageTaskState[taskType];
   task.status = status;
 
@@ -46,22 +49,22 @@ export function setManageTaskStatus(taskType: 'idolCrawl' | 'recordPull', status
   }
 }
 
-export function setManageTaskMessage(taskType: 'idolCrawl' | 'recordPull', message: string) {
+export function setManageTaskMessage(taskType: 'idolCrawl' | 'recordPull' | 'submit', message: string) {
   manageTaskState[taskType].message = message;
 }
 
-export function setManageTaskProgress(taskType: 'idolCrawl' | 'recordPull', progress: ManageTaskProgress) {
+export function setManageTaskProgress(taskType: 'idolCrawl' | 'recordPull' | 'submit', progress: ManageTaskProgress) {
   manageTaskState[taskType].progress = progress;
 }
 
-export function resetManageTaskState(taskType: 'idolCrawl' | 'recordPull') {
+export function resetManageTaskState(taskType: 'idolCrawl' | 'recordPull' | 'submit') {
   manageTaskState[taskType] = {
     status: 'idle',
   };
 }
 
 // 管理任务状态更新函数
-export function updateTaskStatus(taskType: 'idolCrawl' | 'recordPull', status: ManageTaskStatus) {
+export function updateTaskStatus(taskType: 'idolCrawl' | 'recordPull' | 'submit', status: ManageTaskStatus) {
   manageTaskState[taskType].status = status;
   if (status === 'running') {
     manageTaskState[taskType].startedAt = new Date().toISOString();
@@ -70,10 +73,10 @@ export function updateTaskStatus(taskType: 'idolCrawl' | 'recordPull', status: M
   }
 }
 
-export function updateTaskMessage(taskType: 'idolCrawl' | 'recordPull', message: string) {
+export function updateTaskMessage(taskType: 'idolCrawl' | 'recordPull' | 'submit', message: string) {
   manageTaskState[taskType].message = message;
 }
 
-export function updateTaskProgress(taskType: 'idolCrawl' | 'recordPull', progress: ManageTaskProgress) {
+export function updateTaskProgress(taskType: 'idolCrawl' | 'recordPull' | 'submit', progress: ManageTaskProgress) {
   manageTaskState[taskType].progress = progress;
 }

@@ -1,10 +1,10 @@
 use std::sync::Arc;
 
-use luneth::crawl::WebCrawler;
 use serde::Serialize;
 use tauri::{AppHandle, Emitter as _};
 
 use crate::{
+    common::new_crawler,
     db::log::{log_failed_op, log_success_op},
     handlers::{AppError, TaskType},
 };
@@ -22,35 +22,27 @@ impl super::Task {
     ) -> Result<Self, AppError> {
         log::debug!("Creating new auto scraping task for URL: {start_url}");
         let task_type = TaskType::Auto(start_url, with_image);
-        let crawler = Self::new_crawler().await?;
         log::debug!("Auto scraping task created successfully");
         Ok(Self {
             db,
             task_type,
-            crawler,
             app_handle,
         })
     }
 
     pub(super) async fn crawl_auto(&self, url: &str, with_image: bool) -> Result<(), AppError> {
-        auto_crawl_page(
-            &self.app_handle,
-            self.db.as_ref(),
-            &self.crawler,
-            url,
-            with_image,
-        )
-        .await
+        auto_crawl_page(&self.app_handle, self.db.as_ref(), url, with_image).await
     }
 }
 
 async fn auto_crawl_page(
     app_handle: &AppHandle,
     db: &impl DbService,
-    crawler: &WebCrawler,
     start_url: &str,
     with_image: bool,
 ) -> Result<(), AppError> {
+    let crawler = new_crawler().await?.start().await?;
+
     log::debug!("Starting auto crawl for URL: {start_url}");
 
     for i in 1..=MAX_ITER_DEPTH {
@@ -97,7 +89,7 @@ async fn auto_crawl_page(
             break;
         }
 
-        super::batch::crawl_codes(app_handle, db, crawler, &record_ids, with_image).await?;
+        super::batch::crawl_codes(app_handle, db, &crawler, &record_ids, with_image).await?;
         // crawl_page_finished(page_i);
         log::info!(
             "Successfully crawled page: {url}, found {} records",

@@ -6,7 +6,7 @@ use luneth::crawl::WebCrawler;
 use serde::Serialize;
 use tauri::{AppHandle, Emitter as _};
 
-use crate::common::EXIST_IDS;
+use crate::common::{new_crawler, EXIST_IDS};
 use crate::db::log::{log_failed_op, log_success_op};
 use crate::handlers::images::crawl_record_image;
 use crate::handlers::TaskType;
@@ -26,12 +26,10 @@ impl super::Task {
             codes.len()
         );
         let task_type = TaskType::Batch(codes, with_image);
-        let crawler = Self::new_crawler().await?;
         log::debug!("Manual scraping task created successfully");
         Ok(Self {
             db,
             task_type,
-            crawler,
             app_handle,
         })
     }
@@ -41,10 +39,12 @@ impl super::Task {
         codes: &[String],
         with_image: bool,
     ) -> Result<(), AppError> {
+        let crawler = new_crawler().await?.start().await?;
+
         crawl_codes(
             &self.app_handle,
             self.db.as_ref(),
-            &self.crawler,
+            &crawler,
             codes,
             with_image,
         )

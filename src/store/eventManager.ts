@@ -15,7 +15,11 @@ import type {
   RecordPullStartEvent,
   RecordPullProgressEvent,
   RecordPullCompleteEvent,
-  RecordPullFailedEvent
+  RecordPullFailedEvent,
+  SubmitStartEvent,
+  SubmitCodeStartEvent,
+  SubmitCodeResultEvent,
+  SubmitFinishedEvent
 } from '@/types/events';
 
 import {
@@ -234,6 +238,43 @@ export async function initializeGlobalEventListeners() {
       updateTaskMessage('recordPull', event.payload.error);
     });
     unlistenFunctions.push(unlistenRecordFailed);
+
+    // Submit events
+    const unlistenSubmitStart = await listen<SubmitStartEvent>('submit-start', (event) => {
+      console.log('[Event] Submit started:', event.payload);
+      updateTaskStatus('submit', 'running');
+      updateTaskProgress('submit', {
+        processed: 0,
+        total: event.payload.totalCount
+      });
+      updateTaskMessage('submit', `Starting submission of ${event.payload.totalCount} records`);
+    });
+    unlistenFunctions.push(unlistenSubmitStart);
+
+    const unlistenSubmitCodeStart = await listen<SubmitCodeStartEvent>('submit-code-start', (event) => {
+      console.log('[Event] Submit code started:', event.payload);
+      updateTaskMessage('submit', `Submitting: ${event.payload.code}`);
+    });
+    unlistenFunctions.push(unlistenSubmitCodeStart);
+
+    const unlistenSubmitCodeResult = await listen<SubmitCodeResultEvent>('submit-code-result', (event) => {
+      console.log('[Event] Submit code result:', event.payload);
+      // This will be handled by submit-finished for final status
+    });
+    unlistenFunctions.push(unlistenSubmitCodeResult);
+
+    const unlistenSubmitFinished = await listen<SubmitFinishedEvent>('submit-finished', (event) => {
+      console.log('[Event] Submit finished:', event.payload);
+      updateTaskStatus('submit', event.payload.errorCount > 0 ? 'failed' : 'success');
+      updateTaskProgress('submit', {
+        processed: event.payload.totalCount,
+        total: event.payload.totalCount
+      });
+      updateTaskMessage('submit',
+        `Submission completed: ${event.payload.successCount} successful, ${event.payload.errorCount} failed`
+      );
+    });
+    unlistenFunctions.push(unlistenSubmitFinished);
 
     console.log('[EventManager] All event listeners initialized successfully');
 

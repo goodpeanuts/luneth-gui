@@ -71,3 +71,24 @@ export interface RecordPullCompleteEvent {
 export interface RecordPullFailedEvent {
   error: string;
 }
+
+// 提交任务事件接口
+export interface SubmitStartEvent {
+  totalCount: number;
+}
+
+export interface SubmitCodeStartEvent {
+  code: string;
+}
+
+export interface SubmitCodeResultEvent {
+  code: string;
+  status: 'Success' | 'Failed';
+  message: string;
+}
+
+export interface SubmitFinishedEvent {
+  successCount: number;
+  errorCount: number;
+  totalCount: number;
+}
