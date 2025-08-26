@@ -1,6 +1,6 @@
 use luneth::record::{RecordEntry, Recorder};
 use sea_orm::entity::prelude::*;
-use sea_orm::{ActiveModelTrait, Set};
+use sea_orm::{ActiveModelTrait, IntoActiveModel as _, Set};
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel, Serialize, Deserialize)]
@@ -151,13 +151,15 @@ impl Model {
         }
     }
 
-    pub fn set_viewd(mut self, viewed: bool) -> ActiveModel {
-        self.viewed = viewed;
-        self.into()
+    pub fn set_viewd(self, viewed: bool) -> ActiveModel {
+        let mut active_model = self.into_active_model();
+        active_model.viewed = Set(viewed);
+        active_model
     }
 
-    pub fn set_liked(mut self, liked: bool) -> ActiveModel {
-        self.is_liked = liked;
-        self.into()
+    pub fn set_liked(self, liked: bool) -> ActiveModel {
+        let mut active_model = self.into_active_model();
+        active_model.is_liked = Set(liked);
+        active_model
     }
 }

@@ -31,11 +31,3 @@ pub async fn mark_record_unliked(app: tauri::AppHandle, code: &str) -> Result<()
         .await
         .map_err(|e| e.to_string())
 }
-
-// #[tauri::command(rename_all = "snake_case")]
-// pub async fn mark_record_viewed(
-//     app: tauri::AppHandle,
-//     code: &str
-// ) -> Result<(), String> {
-//     todo!()
-// }
