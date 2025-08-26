@@ -35,7 +35,7 @@ pub async fn read_local_record_image(
     match ImageData::read_from_dir_path(&image_base_path, Some(record_id), &file_name) {
         Ok(image_data) => Ok(Some(image_data.bytes)),
         Err(e) => {
-            log::debug!("Failed to read local image {file_name}: {e}");
+            log::error!("Failed to read local image {file_name}: {e}");
             Ok(None)
         }
     }
