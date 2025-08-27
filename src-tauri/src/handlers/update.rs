@@ -6,9 +6,9 @@ use serde::Serialize;
 use tauri::{AppHandle, Emitter as _};
 
 use crate::{
-    common::new_crawler,
+    common::new_crawler_with_config,
     db::log::{log_failed_op, log_success_op},
-    handlers::{images::crawl_record_image, TaskType},
+    handlers::{images::crawl_record_image, BatchCrawlConfig, TaskType},
     AppError,
 };
 use luneth_db::OperationType;
@@ -17,23 +17,28 @@ impl super::Task {
     pub async fn new_update(
         app_handle: AppHandle,
         db: Arc<DbOperator>,
-        codes: Vec<String>,
-    ) -> Self {
-        Self {
+        config: BatchCrawlConfig,
+    ) -> Result<Self, AppError> {
+        let task_type = TaskType::Update(config);
+        Ok(Self {
             app_handle,
             db,
-            task_type: TaskType::Update(codes),
-        }
+            task_type,
+        })
     }
 
     #[expect(clippy::too_many_lines)]
-    pub async fn update_codes(&self, codes: &[String]) -> Result<(), AppError> {
-        let crawler = new_crawler().await?.start().await?;
+    pub async fn update_codes(&self, config: &BatchCrawlConfig) -> Result<(), AppError> {
+        let batch = &config.batch;
+        let config = config.crawl_config.clone();
+        log::debug!("Executing update crawl task for {} codes", batch.len());
+
+        let crawler = new_crawler_with_config(config).await?.start().await?;
         let mut update_count = 0;
         let mut success_count = 0;
         let mut error_count = 0;
 
-        let inputs = codes
+        let inputs = batch
             .iter()
             .map(|code| CrawlInput::Code(code.to_owned()))
             .collect::<Vec<_>>();

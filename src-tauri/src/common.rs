@@ -1,6 +1,9 @@
 use std::{path::PathBuf, sync::LazyLock};
 
-use luneth::{client::Postman, crawl::WebCrawler};
+use luneth::{
+    client::Postman,
+    crawl::{CrawlConfig, WebCrawler},
+};
 use luneth_db::DbService;
 use tauri::{AppHandle, Manager as _};
 use tokio::sync::{Mutex, RwLock};
@@ -66,17 +69,26 @@ pub static TASK_BASE_URL: LazyLock<Mutex<Option<String>>> = LazyLock::new(|| {
     Mutex::new(None) // Default base URL
 });
 
+pub async fn get_task_base_url() -> Result<String, AppError> {
+    let Some(base_url) = TASK_BASE_URL.lock().await.clone() else {
+        return Err(AppError::GetAuthFailed("Task base URL is not set".into()));
+    };
+    Ok(base_url)
+}
+
 pub async fn new_crawler() -> Result<WebCrawler, AppError> {
     log::debug!("Creating new web crawler");
-    let Some(base_url) = TASK_BASE_URL.lock().await.clone() else {
-        log::warn!("No base URL configured, using default crawler");
-        return WebCrawler::new().map_err(AppError::CrawlError);
-    };
+    let base_url = get_task_base_url().await?;
 
     log::debug!("Creating crawler with base URL: {base_url}");
     let config = luneth::crawl::CrawlConfig {
         base_url: base_url.clone(),
         ..Default::default()
     };
+    WebCrawler::with_config(config).map_err(AppError::CrawlError)
+}
+
+pub async fn new_crawler_with_config(config: CrawlConfig) -> Result<WebCrawler, AppError> {
+    log::debug!("Creating crawler with config: {config:?}");
     WebCrawler::with_config(config).map_err(AppError::CrawlError)
 }

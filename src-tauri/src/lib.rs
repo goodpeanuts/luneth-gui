@@ -30,7 +30,7 @@ use crate::command::{
     },
     log::get_log_dir,
     task::{
-        launch_auto_scrap_task, launch_idol_scrap_task, launch_manual_scrap_task,
+        launch_auto_scrap_task, launch_batch_scrap_task, launch_idol_scrap_task,
         launch_record_pull_task, launch_submit_task, launch_update_task,
     },
 };
@@ -171,7 +171,7 @@ pub fn run() {
             export_to_file,
             get_all_records,
             launch_auto_scrap_task,
-            launch_manual_scrap_task,
+            launch_batch_scrap_task,
             get_all_op_history,
             set_task_base_url,
             set_client_auth,
