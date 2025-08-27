@@ -858,7 +858,7 @@ async function handleAutoScraping() {
     webdriver_port: config.value.webdriverPort
   };
 
-  await invoke('auto_crawl_page', params);
+  await invoke('launch_auto_scrap_task', params);
   successMessage.value = 'Auto crawling started successfully!';
 }
 
@@ -887,7 +887,7 @@ async function handleBatchScraping() {
     webdriver_port: config.value.webdriverPort
   };
 
-  await invoke('crawl_codes', params);
+  await invoke('launch_batch_scrap_task', params);
   successMessage.value = `Batch crawling started for ${codes.length} records!`;
 }
 
