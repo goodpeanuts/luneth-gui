@@ -1,6 +1,6 @@
-use std::sync::Arc;
-
+use luneth::crawl::CrawlInput;
 use serde::Serialize;
+use std::sync::Arc;
 use tauri::{AppHandle, Emitter as _};
 
 use crate::{
@@ -79,22 +79,21 @@ async fn auto_crawl_page(
             }
         };
 
-        let record_ids = record_pieces
+        let record_inputs = record_pieces
             .into_iter()
-            .map(|r| r.code)
+            .map(CrawlInput::Piece)
             .collect::<Vec<_>>();
 
-        if record_ids.is_empty() {
+        if record_inputs.is_empty() {
             log::warn!("No records found on page {i}, stopping crawl");
             break;
         }
 
-        super::batch::crawl_codes(app_handle, db, &crawler, &record_ids, with_image).await?;
+        let total_count = record_inputs.len();
+
+        super::batch::crawl_codes(app_handle, db, &crawler, record_inputs, with_image).await?;
         // crawl_page_finished(page_i);
-        log::info!(
-            "Successfully crawled page: {url}, found {} records",
-            record_ids.len()
-        );
+        log::info!("Successfully crawled page: {url}, found {total_count} records",);
 
         // Send page finished event to frontend (this will be sent by crawl_codes_finished event)
     }

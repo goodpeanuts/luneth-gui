@@ -11,7 +11,7 @@ pub async fn crawl_record_image(
     recorder: &Recorder,
 ) -> Result<PathBuf, AppError> {
     let record_image_path = get_record_image_path(app_handle)?;
-    let images = crawler.crawl_imgs_by_record(recorder).await?;
+    let images = crawler.crawl_recorder_image(recorder).await?;
     let mut error_message = Vec::new();
     let mut save_path = None;
     for image in images.as_ref() {

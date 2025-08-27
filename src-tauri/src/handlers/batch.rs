@@ -2,7 +2,7 @@ use std::fmt::Debug;
 use std::fs;
 use std::sync::Arc;
 
-use luneth::crawl::WebCrawler;
+use luneth::crawl::{CrawlInput, WebCrawler};
 use serde::Serialize;
 use tauri::{AppHandle, Emitter as _};
 
@@ -40,29 +40,31 @@ impl super::Task {
         with_image: bool,
     ) -> Result<(), AppError> {
         let crawler = new_crawler().await?.start().await?;
+        let inputs = codes
+            .iter()
+            .map(|code| CrawlInput::Code(code.to_owned()))
+            .collect();
 
         crawl_codes(
             &self.app_handle,
             self.db.as_ref(),
             &crawler,
-            codes,
+            inputs,
             with_image,
         )
         .await
     }
 }
 
-pub async fn crawl_codes<T>(
+pub async fn crawl_codes(
     app_handle: &AppHandle,
     db: &impl DbService,
     crawler: &WebCrawler,
-    codes: &[T],
+    inputs: Vec<CrawlInput>,
     with_image: bool,
-) -> Result<(), AppError>
-where
-    T: AsRef<str> + Debug,
-{
-    log::debug!("Starting to crawl {} codes", codes.len());
+) -> Result<(), AppError> {
+    let total_count = inputs.len();
+    log::debug!("Starting to crawl {total_count} codes");
     let mut success_count = 0;
     let mut error_count = 0;
 
@@ -70,15 +72,15 @@ where
     let exist_records = EXIST_IDS.read().await.ids.clone();
 
     // Send initial progress event - unified batch crawl start
-    report_batch_crawl_start(app_handle, codes.len());
+    report_batch_crawl_start(app_handle, total_count);
 
-    for code in codes {
-        let code = code.as_ref();
-        if exist_records.contains(&code.to_owned()) {
+    for input in inputs {
+        let code = input.get_code().to_owned();
+        if exist_records.contains(&code.clone()) {
             log::debug!("skip, {code} already exist");
             report_crawl_code_result(
                 app_handle,
-                code,
+                &code,
                 CrawlStatus::Exist,
                 "Record already exists".to_owned(),
             );
@@ -88,7 +90,7 @@ where
 
         log::debug!("Crawling code: {code}");
 
-        match crawler.crawl_code(code).await {
+        match crawler.crawl_recorder(input).await {
             Ok(record) => {
                 let mut image_path_dir = None;
                 let record_model = if with_image {
@@ -104,14 +106,14 @@ where
                     Ok(_) => {
                         // crawl_code_report
                         // log_success_crawl_record_op(db, code).await?;
-                        log_success_op(db, OperationType::CrawlRecord, code).await?;
+                        log_success_op(db, OperationType::CrawlRecord, &code).await?;
                         success_count += 1;
                         log::info!("Successfully crawled and saved code: {code}");
 
                         // Send progress event to frontend
                         report_crawl_code_result(
                             app_handle,
-                            code,
+                            &code,
                             CrawlStatus::Success,
                             "Successfully crawled".to_owned(),
                         );
@@ -122,13 +124,13 @@ where
                             fs::remove_dir_all(image_path_dir).map_err(AppError::from)?;
                         }
                         log::error!("Failed to insert record for code {code}: {e}");
-                        log_failed_op(db, OperationType::CrawlRecord, code, e.to_string()).await?;
+                        log_failed_op(db, OperationType::CrawlRecord, &code, e.to_string()).await?;
                         error_count += 1;
 
                         // Send progress event to frontend
                         report_crawl_code_result(
                             app_handle,
-                            code,
+                            &code,
                             CrawlStatus::Failed,
                             format!("Failed to save: {e}"),
                         );
@@ -138,13 +140,13 @@ where
             Err(e) => {
                 // crawl_code_report
                 log::warn!("Failed to crawl code {code}: {e}");
-                log_failed_op(db, OperationType::CrawlRecord, code, e.to_string()).await?;
+                log_failed_op(db, OperationType::CrawlRecord, &code, e.to_string()).await?;
                 error_count += 1;
 
                 // Send progress event to frontend
                 report_crawl_code_result(
                     app_handle,
-                    code,
+                    &code,
                     CrawlStatus::Failed,
                     format!("Crawl failed: {e}"),
                 );
@@ -154,12 +156,11 @@ where
 
     // crawl_codes_finished
     log::info!(
-        "Crawling completed: {success_count} successful, {error_count} errors out of {} total codes",
-        codes.len()
+        "Crawling completed: {success_count} successful, {error_count} errors out of {total_count} total codes"
     );
 
     // Send finished event to frontend
-    report_crawl_codes_finished(app_handle, success_count, error_count, codes.len());
+    report_crawl_codes_finished(app_handle, success_count, error_count, total_count);
 
     Ok(())
 }
