@@ -1,7 +1,7 @@
 use super::{Model, Result};
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, IntoActiveModel,
-    PrimaryKeyTrait, QueryFilter as _, QuerySelect as _, sea_query::IntoCondition,
+    PrimaryKeyTrait, QueryFilter as _, QueryOrder as _, QuerySelect as _, sea_query::IntoCondition,
 };
 
 impl super::service::DbService for super::DbOperator {
@@ -132,5 +132,14 @@ impl super::service::DbService for super::DbOperator {
             .await?;
 
         Ok(results)
+    }
+
+    async fn get_records_ordered_by_updated_at(&self) -> Result<Vec<crate::record_local::Model>> {
+        use crate::record_local;
+        let records = record_local::Entity::find()
+            .order_by_desc(record_local::Column::UpdatedAt)
+            .all(&self.db)
+            .await?;
+        Ok(records)
     }
 }

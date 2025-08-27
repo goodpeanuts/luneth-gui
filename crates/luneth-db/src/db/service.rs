@@ -56,6 +56,8 @@ pub trait DbService {
         E: EntityTrait,
         C: ColumnTrait,
         T: sea_orm::TryGetable + Send;
+
+    async fn get_records_ordered_by_updated_at(&self) -> Result<Vec<crate::record_local::Model>>;
 }
 
 // 使用示例：可以用通用函数查询其他列

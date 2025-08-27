@@ -18,17 +18,7 @@ pub(crate) async fn get_records_ordered_by_updated_at(
 ) -> Result<Vec<RecorderModel>, AppError> {
     log::debug!("Querying all records from database ordered by updated_at desc");
 
-    let mut records = db
-        .query_entity::<luneth_db::record_local::Entity>(None, None)
-        .await?;
-
-    // 手动排序按 updated_at 从新到旧
-    records.sort_by(|a, b| b.updated_at.cmp(&a.updated_at));
-
-    log::debug!(
-        "Successfully retrieved {} records ordered by updated_at",
-        records.len()
-    );
+    let records = db.get_records_ordered_by_updated_at().await?;
     Ok(records)
 }
 
