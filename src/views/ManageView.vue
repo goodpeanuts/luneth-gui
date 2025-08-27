@@ -168,6 +168,89 @@
             ⚠️ Configuration required
           </div>
         </div>
+
+        <!-- Update Task -->
+        <div class="task-card">
+          <div class="task-header">
+            <h3 class="task-name">Update Records</h3>
+            <div class="task-description">
+              Update existing records with latest data and images
+            </div>
+          </div>
+
+          <!-- Filter Options -->
+          <div class="filter-section">
+            <h4 class="filter-title">Filter Conditions:</h4>
+            <div class="filter-options">
+              <label class="filter-option">
+                <input
+                  type="checkbox"
+                  v-model="updateFilters.isLiked"
+                  @change="updateUpdateFilteredCount"
+                />
+                <span>Liked Records</span>
+              </label>
+
+              <label class="filter-option">
+                <input
+                  type="checkbox"
+                  v-model="updateFilters.hasLocalImages"
+                  @change="updateUpdateFilteredCount"
+                />
+                <span>Has Local Images</span>
+              </label>
+
+              <label class="filter-option">
+                <input
+                  type="checkbox"
+                  v-model="updateFilters.isViewed"
+                  @change="updateUpdateFilteredCount"
+                />
+                <span>Viewed Records</span>
+              </label>
+            </div>
+
+            <div class="filter-result">
+              <span v-if="updateFilteredRecordsCount >= 0">
+                {{ updateFilteredRecordsCount }} records match the criteria
+              </span>
+              <span v-else class="loading-text">
+                Loading records...
+              </span>
+            </div>
+          </div>
+
+          <div class="task-status">
+            <div class="status-container">
+              <div class="status-info">
+                <div class="status-line">{{ getStatusText('update') }}</div>
+                <div v-if="manageTaskState.update.message" class="status-message">
+                  {{ manageTaskState.update.message }}
+                </div>
+                <div v-if="manageTaskState.update.progress" class="status-progress">
+                  Progress: {{ manageTaskState.update.progress.processed }}/{{ manageTaskState.update.progress.total }}
+                </div>
+              </div>
+            </div>
+
+            <button
+              class="task-btn"
+              :class="{
+                disabled: !isConfigured || isAnyTaskRunning || updateFilteredRecordsCount <= 0,
+                running: manageTaskState.update.status === 'running'
+              }"
+              @click="startUpdateTask"
+              :disabled="!isConfigured || isAnyTaskRunning || updateFilteredRecordsCount <= 0"
+            >
+              <span v-if="manageTaskState.update.status === 'running'">Updating...</span>
+              <span v-else>Update Records ({{ updateFilteredRecordsCount }})</span>
+            </button>
+          </div>
+
+          <div v-if="!isConfigured" class="config-warning">
+            ⚠️ Configuration required
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -200,11 +283,21 @@ const submitFilters = ref({
   hasLocalImages: false,
 });
 
+// 更新任务筛选条件
+const updateFilters = ref({
+  isLiked: false,
+  hasLocalImages: false,
+  isViewed: false,
+});
+
 // 所有记录
 const allRecords = ref<RecordLocal[]>([]);
 
 // 筛选后的记录数量
 const filteredRecordsCount = ref(-1);
+
+// 更新任务筛选后的记录数量
+const updateFilteredRecordsCount = ref(-1);
 
 // Configuration check
 const isConfigured = computed(() => {
@@ -216,11 +309,12 @@ const isConfigured = computed(() => {
 const isAnyTaskRunning = computed(() => {
   return manageTaskState.idolCrawl.status === 'running' ||
          manageTaskState.recordPull.status === 'running' ||
-         manageTaskState.submit.status === 'running';
+         manageTaskState.submit.status === 'running' ||
+         manageTaskState.update.status === 'running';
 });
 
 // Status text helper
-const getStatusText = (taskType: 'idolCrawl' | 'recordPull' | 'submit') => {
+const getStatusText = (taskType: 'idolCrawl' | 'recordPull' | 'submit' | 'update') => {
   const status = manageTaskState[taskType].status;
   switch (status) {
     case 'idle':
@@ -241,10 +335,12 @@ const fetchAllRecords = async () => {
   try {
     allRecords.value = await invoke<RecordLocal[]>('get_all_records');
     updateFilteredCount();
+    updateUpdateFilteredCount();
   } catch (error) {
     console.error('Failed to fetch records:', error);
     allRecords.value = [];
     filteredRecordsCount.value = 0;
+    updateFilteredRecordsCount.value = 0;
   }
 };
 
@@ -335,6 +431,69 @@ const startSubmitTask = async () => {
     console.error('Failed to start submit task:', error);
     updateTaskStatus('submit', 'failed');
     updateTaskMessage('submit', `Error: ${error}`);
+  }
+};
+
+// 更新任务筛选后的记录数量
+const updateUpdateFilteredCount = () => {
+  if (allRecords.value.length === 0) {
+    updateFilteredRecordsCount.value = 0;
+    return;
+  }
+
+  let filtered = allRecords.value;
+
+  // 如果选择了喜欢的记录
+  if (updateFilters.value.isLiked) {
+    filtered = filtered.filter(record => record.is_liked);
+  }
+
+  // 如果选择了有本地图片的记录
+  if (updateFilters.value.hasLocalImages) {
+    filtered = filtered.filter(record => record.is_cached_locally && record.local_image_count > 0);
+  }
+
+  // 如果选择了已查看的记录
+  if (updateFilters.value.isViewed) {
+    filtered = filtered.filter(record => record.viewed);
+  }
+
+  // 如果没有选择任何筛选条件，返回0
+  if (!updateFilters.value.isLiked && !updateFilters.value.hasLocalImages && !updateFilters.value.isViewed) {
+    updateFilteredRecordsCount.value = 0;
+    return;
+  }
+
+  updateFilteredRecordsCount.value = filtered.length;
+};
+
+const startUpdateTask = async () => {
+  if (!isConfigured.value || isAnyTaskRunning.value || updateFilteredRecordsCount.value <= 0) return;
+
+  try {
+    // 获取符合条件的记录ID
+    let filtered = allRecords.value;
+
+    if (updateFilters.value.isLiked) {
+      filtered = filtered.filter(record => record.is_liked);
+    }
+
+    if (updateFilters.value.hasLocalImages) {
+      filtered = filtered.filter(record => record.is_cached_locally && record.local_image_count > 0);
+    }
+
+    if (updateFilters.value.isViewed) {
+      filtered = filtered.filter(record => record.viewed);
+    }
+
+    const recordIds = filtered.map(record => record.id);
+
+    updateTaskStatus('update', 'running');
+    await invoke('launch_update_task', { codes: recordIds });
+  } catch (error) {
+    console.error('Failed to start update task:', error);
+    updateTaskStatus('update', 'failed');
+    updateTaskMessage('update', `Error: ${error}`);
   }
 };
 

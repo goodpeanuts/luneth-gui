@@ -20,18 +20,18 @@ impl super::Task {
         db: Arc<DbOperator>,
         codes: Vec<String>,
         with_image: bool,
-    ) -> Result<Self, AppError> {
+    ) -> Self {
         log::debug!(
             "Creating new manual scraping task for {} codes",
             codes.len()
         );
         let task_type = TaskType::Batch(codes, with_image);
         log::debug!("Manual scraping task created successfully");
-        Ok(Self {
+        Self {
             db,
             task_type,
             app_handle,
-        })
+        }
     }
 
     pub(super) async fn crawl_batch(

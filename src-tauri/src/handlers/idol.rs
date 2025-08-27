@@ -12,15 +12,15 @@ use crate::{
 };
 
 impl super::Task {
-    pub async fn new_idol(app_handle: AppHandle, db: Arc<DbOperator>) -> Result<Self, AppError> {
+    pub async fn new_idol(app_handle: AppHandle, db: Arc<DbOperator>) -> Self {
         log::debug!("Creating new idol scraping task ");
         let task_type = TaskType::Idol;
         log::debug!("Idol scraping task created successfully");
-        Ok(Self {
+        Self {
             db,
             task_type,
             app_handle,
-        })
+        }
     }
 
     pub(super) async fn crawl_idol(&self) -> Result<(), AppError> {

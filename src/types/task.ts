@@ -33,4 +33,5 @@ export interface ManageTasksState {
   idolCrawl: ManageTaskState;
   recordPull: ManageTaskState;
   submit: ManageTaskState;
+  update: ManageTaskState;
 }

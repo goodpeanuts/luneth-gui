@@ -19,15 +19,15 @@ impl super::Task {
         db: Arc<DbOperator>,
         start_url: String,
         with_image: bool,
-    ) -> Result<Self, AppError> {
+    ) -> Self {
         log::debug!("Creating new auto scraping task for URL: {start_url}");
         let task_type = TaskType::Auto(start_url, with_image);
         log::debug!("Auto scraping task created successfully");
-        Ok(Self {
+        Self {
             db,
             task_type,
             app_handle,
-        })
+        }
     }
 
     pub(super) async fn crawl_auto(&self, url: &str, with_image: bool) -> Result<(), AppError> {

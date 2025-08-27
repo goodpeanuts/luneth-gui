@@ -74,7 +74,7 @@ pub async fn pull_record_slim(
         // Create a simple runtime for the async task
         let rt = tokio::runtime::Runtime::new().map_err(|e| e.to_string())?;
         rt.block_on(async move {
-            let task = Task::new_pull_record_slim(app, db).await?;
+            let task = Task::new_pull_record_slim(app, db).await;
             log::debug!("Pull record slim task created ");
             task.exec().await?;
             log::debug!("Pull record slim task completed successfully",);

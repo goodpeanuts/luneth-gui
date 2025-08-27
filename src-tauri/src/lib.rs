@@ -31,7 +31,7 @@ use crate::command::{
     log::get_log_dir,
     task::{
         launch_auto_scrap_task, launch_idol_scrap_task, launch_manual_scrap_task,
-        launch_record_pull_task, launch_submit_task,
+        launch_record_pull_task, launch_submit_task, launch_update_task,
     },
 };
 
@@ -186,6 +186,7 @@ pub fn run() {
             launch_record_pull_task,
             launch_submit_task,
             get_log_dir,
+            launch_update_task
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

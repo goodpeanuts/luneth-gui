@@ -6,7 +6,7 @@ use luneth_db::entities::record_local::Model as RecorderModel;
 use tauri::{Manager as _, State};
 
 use crate::{
-    db::read::{get_op_history, get_records},
+    db::read::{get_op_history, get_records_ordered_by_updated_at},
     AppState,
 };
 
@@ -14,9 +14,11 @@ use crate::{
 pub async fn get_all_records(
     state: State<'_, Arc<AppState>>,
 ) -> Result<Vec<RecorderModel>, String> {
-    log::debug!("Fetching all records from database");
+    log::debug!("Fetching all records from database ordered by updated_at");
     let db = Arc::clone(&state.db);
-    let records = get_records(db.as_ref()).await.map_err(|e| e.to_string())?;
+    let records = get_records_ordered_by_updated_at(db.as_ref())
+        .await
+        .map_err(|e| e.to_string())?;
     log::info!("Retrieved {} records from database", records.len());
     Ok(records)
 }
