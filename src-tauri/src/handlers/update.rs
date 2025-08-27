@@ -1,5 +1,6 @@
 use std::{ops::Not as _, sync::Arc};
 
+use luneth::crawl::CrawlInput;
 use luneth_db::{DbOperator, DbService as _};
 use serde::Serialize;
 use tauri::{AppHandle, Emitter as _};
@@ -26,29 +27,36 @@ impl super::Task {
     }
 
     #[expect(clippy::too_many_lines)]
-    pub async fn update_codes(&self, codes: &Vec<String>) -> Result<(), AppError> {
+    pub async fn update_codes(&self, codes: &[String]) -> Result<(), AppError> {
         let crawler = new_crawler().await?.start().await?;
         let mut update_count = 0;
         let mut success_count = 0;
         let mut error_count = 0;
 
-        // Send initial progress event
-        report_update_start(&self.app_handle, codes.len());
+        let inputs = codes
+            .iter()
+            .map(|code| CrawlInput::Code(code.to_owned()))
+            .collect::<Vec<_>>();
+        let total_count = inputs.len();
 
-        for code in codes {
-            match crawler.crawl_code(code).await {
+        // Send initial progress event
+        report_update_start(&self.app_handle, total_count);
+
+        for input in inputs {
+            let code = input.get_code().to_owned();
+            match crawler.crawl_recorder(input).await {
                 Ok(recorder) => {
                     use luneth_db::record_local::Entity as RecordEntity;
                     let Some(local_record) = self
                         .db
-                        .find_record_local_by_id::<RecordEntity>(code)
+                        .find_record_local_by_id::<RecordEntity>(&code)
                         .await?
                     else {
                         log::error!("Record {code} not found in local database, skipping update");
                         log_failed_op(
                             self.db.as_ref(),
                             OperationType::Update,
-                            code,
+                            &code,
                             "Record not found".to_owned(),
                         )
                         .await?;
@@ -56,7 +64,7 @@ impl super::Task {
 
                         report_update_code_result(
                             &self.app_handle,
-                            code,
+                            &code,
                             UpdateStatus::Failed,
                             "Record not found in local database".to_owned(),
                         );
@@ -74,7 +82,7 @@ impl super::Task {
                             log_failed_op(
                                 self.db.as_ref(),
                                 OperationType::Update,
-                                code,
+                                &code,
                                 format!("Failed to crawl images: {e}"),
                             )
                             .await?;
@@ -82,7 +90,7 @@ impl super::Task {
 
                             report_update_code_result(
                                 &self.app_handle,
-                                code,
+                                &code,
                                 UpdateStatus::Failed,
                                 format!("Failed to crawl images: {e}"),
                             );
@@ -113,12 +121,12 @@ impl super::Task {
                     if updated_something {
                         update_count += 1;
                         success_count += 1;
-                        log_success_op(self.db.as_ref(), OperationType::Update, code).await?;
+                        log_success_op(self.db.as_ref(), OperationType::Update, &code).await?;
                         log::debug!("Successfully updated {code}");
 
                         report_update_code_result(
                             &self.app_handle,
-                            code,
+                            &code,
                             UpdateStatus::Success,
                             format!("Updated: {}", update_messages.join(", ")),
                         );
@@ -126,7 +134,7 @@ impl super::Task {
                         success_count += 1;
                         report_update_code_result(
                             &self.app_handle,
-                            code,
+                            &code,
                             UpdateStatus::Success,
                             "No updates needed".to_owned(),
                         );
@@ -134,13 +142,18 @@ impl super::Task {
                 }
                 Err(e) => {
                     log::error!("Failed crawl {code} to update: {e}");
-                    log_failed_op(self.db.as_ref(), OperationType::Update, code, e.to_string())
-                        .await?;
+                    log_failed_op(
+                        self.db.as_ref(),
+                        OperationType::Update,
+                        &code,
+                        e.to_string(),
+                    )
+                    .await?;
                     error_count += 1;
 
                     report_update_code_result(
                         &self.app_handle,
-                        code,
+                        &code,
                         UpdateStatus::Failed,
                         format!("Crawl failed: {e}"),
                     );
@@ -151,7 +164,7 @@ impl super::Task {
         log::info!("Updated {update_count} codes");
 
         // Send finished event
-        report_update_finished(&self.app_handle, success_count, error_count, codes.len());
+        report_update_finished(&self.app_handle, success_count, error_count, total_count);
 
         Ok(())
     }
