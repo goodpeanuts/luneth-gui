@@ -6,41 +6,57 @@ use luneth::crawl::{CrawlInput, WebCrawler};
 use serde::Serialize;
 use tauri::{AppHandle, Emitter as _};
 
-use crate::common::{new_crawler, EXIST_IDS};
+use crate::common::{new_crawler_with_config, EXIST_IDS};
 use crate::db::log::{log_failed_op, log_success_op};
 use crate::handlers::images::crawl_record_image;
-use crate::handlers::TaskType;
+use crate::handlers::{BatchCrawlConfig, TaskType};
 use crate::AppError;
 use luneth_db::entities::record_local::Model as RecorderModel;
 use luneth_db::{DbOperator, DbService, OperationType};
 
 impl super::Task {
+    #[expect(clippy::too_many_arguments)]
     pub async fn new_manual(
         app_handle: AppHandle,
         db: Arc<DbOperator>,
-        codes: Vec<String>,
+        batch: Vec<String>,
         with_image: bool,
-    ) -> Self {
+        headless: bool,
+        load_timeout: u64,
+        request_delay: u64,
+        webdriver_port: u16,
+    ) -> Result<Self, AppError> {
         log::debug!(
             "Creating new manual scraping task for {} codes",
-            codes.len()
+            batch.len()
         );
-        let task_type = TaskType::Batch(codes, with_image);
+
+        let config = BatchCrawlConfig::new(
+            batch,
+            with_image,
+            headless,
+            load_timeout,
+            request_delay,
+            webdriver_port,
+        )
+        .await?;
+        let task_type = TaskType::Batch(config);
         log::debug!("Manual scraping task created successfully");
-        Self {
+        Ok(Self {
             db,
             task_type,
             app_handle,
-        }
+        })
     }
 
-    pub(super) async fn crawl_batch(
-        &self,
-        codes: &[String],
-        with_image: bool,
-    ) -> Result<(), AppError> {
-        let crawler = new_crawler().await?.start().await?;
-        let inputs = codes
+    pub(super) async fn crawl_batch(&self, config: &BatchCrawlConfig) -> Result<(), AppError> {
+        let crawler = new_crawler_with_config(config.crawl_config.clone())
+            .await?
+            .start()
+            .await?;
+
+        let inputs = config
+            .batch
             .iter()
             .map(|code| CrawlInput::Code(code.to_owned()))
             .collect();
@@ -50,7 +66,7 @@ impl super::Task {
             self.db.as_ref(),
             &crawler,
             inputs,
-            with_image,
+            config.with_image,
         )
         .await
     }

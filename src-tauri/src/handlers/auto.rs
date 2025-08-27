@@ -4,9 +4,9 @@ use std::sync::Arc;
 use tauri::{AppHandle, Emitter as _};
 
 use crate::{
-    common::new_crawler,
+    common::new_crawler_with_config,
     db::log::{log_failed_op, log_success_op},
-    handlers::{AppError, TaskType},
+    handlers::{AppError, AutoCrawlConfig, TaskType},
 };
 use luneth_db::{DbOperator, DbService, OperationType};
 
@@ -14,34 +14,51 @@ use luneth_db::{DbOperator, DbService, OperationType};
 const MAX_ITER_DEPTH: usize = 30;
 
 impl super::Task {
+    #[expect(clippy::too_many_arguments)]
     pub async fn new_auto(
         app_handle: AppHandle,
         db: Arc<DbOperator>,
         start_url: String,
         with_image: bool,
-    ) -> Self {
+        headless: bool,
+        load_timeout: u64,
+        request_delay: u64,
+        webdriver_port: u16,
+    ) -> Result<Self, AppError> {
         log::debug!("Creating new auto scraping task for URL: {start_url}");
-        let task_type = TaskType::Auto(start_url, with_image);
+        let config = AutoCrawlConfig::new(
+            start_url,
+            with_image,
+            headless,
+            load_timeout,
+            request_delay,
+            webdriver_port,
+        )
+        .await?;
+        let task_type = TaskType::Auto(config);
         log::debug!("Auto scraping task created successfully");
-        Self {
+        Ok(Self {
             db,
             task_type,
             app_handle,
-        }
+        })
     }
 
-    pub(super) async fn crawl_auto(&self, url: &str, with_image: bool) -> Result<(), AppError> {
-        auto_crawl_page(&self.app_handle, self.db.as_ref(), url, with_image).await
+    pub(super) async fn crawl_auto(&self, config: &AutoCrawlConfig) -> Result<(), AppError> {
+        auto_crawl_page(&self.app_handle, self.db.as_ref(), config).await
     }
 }
 
 async fn auto_crawl_page(
     app_handle: &AppHandle,
     db: &impl DbService,
-    start_url: &str,
-    with_image: bool,
+    config: &AutoCrawlConfig,
 ) -> Result<(), AppError> {
-    let crawler = new_crawler().await?.start().await?;
+    let start_url = config.start_url.clone();
+    let with_image = config.with_image;
+    let config = config.crawl_config.clone();
+
+    let crawler = new_crawler_with_config(config).await?.start().await?;
 
     log::debug!("Starting auto crawl for URL: {start_url}");
 

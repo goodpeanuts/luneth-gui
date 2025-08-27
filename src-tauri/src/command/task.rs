@@ -10,13 +10,18 @@ use tauri::State;
 // #############
 
 #[tauri::command(rename_all = "snake_case")]
+#[expect(clippy::too_many_arguments)]
 pub async fn launch_auto_scrap_task(
     app: tauri::AppHandle,
     state: State<'_, Arc<AppState>>,
-    url: String,
+    start_url: String,
     with_image: bool,
+    headless: bool,
+    load_timeout: u64,
+    request_delay: u64,
+    webdriver_port: u16,
 ) -> Result<(), String> {
-    log::debug!("Launching auto scraping task for URL: {url}");
+    log::debug!("Launching auto scraping task for URL: {start_url}");
     let db = Arc::clone(&state.db);
 
     // Use a blocking thread to handle non-Send types
@@ -24,10 +29,21 @@ pub async fn launch_auto_scrap_task(
         // Create a simple runtime for the async task
         let rt = tokio::runtime::Runtime::new().map_err(|e| e.to_string())?;
         rt.block_on(async move {
-            let task = Task::new_auto(app, db, url.clone(), with_image).await;
-            log::debug!("Auto scraping task created for URL: {url}");
-            task.exec().await?;
-            log::debug!("Auto scraping task completed successfully for URL: {url}");
+            let task = Task::new_auto(
+                app,
+                db,
+                start_url.clone(),
+                with_image,
+                headless,
+                load_timeout,
+                request_delay,
+                webdriver_port,
+            )
+            .await
+            .map_err(|e| e.to_string())?;
+            log::debug!("Auto scraping task created for URL: {start_url}");
+            task.exec().await.map_err(|e| e.to_string())?;
+            log::debug!("Auto scraping task completed successfully for URL: {start_url}");
             Ok::<(), String>(())
         })
     });
@@ -45,14 +61,19 @@ pub async fn launch_auto_scrap_task(
 }
 
 #[tauri::command(rename_all = "snake_case")]
-pub async fn launch_manual_scrap_task(
+#[expect(clippy::too_many_arguments)]
+pub async fn launch_batch_scrap_task(
     app: tauri::AppHandle,
     state: State<'_, Arc<AppState>>,
-    codes: Vec<String>,
+    batch: Vec<String>,
     with_image: bool,
+    headless: bool,
+    load_timeout: u64,
+    request_delay: u64,
+    webdriver_port: u16,
 ) -> Result<(), String> {
-    log::debug!("Launching manual scraping task for {} codes", codes.len());
-    log::debug!("Codes to scrape: {codes:?}");
+    log::debug!("Launching manual scraping task for {} codes", batch.len());
+    log::debug!("Codes to scrape: {batch:?}");
     let db = Arc::clone(&state.db);
 
     // Use a blocking thread to handle non-Send types
@@ -60,12 +81,23 @@ pub async fn launch_manual_scrap_task(
         // Create a simple runtime for the async task
         let rt = tokio::runtime::Runtime::new().map_err(|e| e.to_string())?;
         rt.block_on(async move {
-            let task = Task::new_manual(app, db, codes.clone(), with_image).await;
-            log::debug!("Manual scraping task created for {} codes", codes.len());
-            task.exec().await?;
+            let task = Task::new_manual(
+                app,
+                db,
+                batch.clone(),
+                with_image,
+                headless,
+                load_timeout,
+                request_delay,
+                webdriver_port,
+            )
+            .await
+            .map_err(|e| e.to_string())?;
+            log::debug!("Manual scraping task created for {} codes", batch.len());
+            task.exec().await.map_err(|e| e.to_string())?;
             log::debug!(
-                "CommandManual scraping task completed successfully for {} codes",
-                codes.len()
+                "Command Manual scraping task completed successfully for {} codes",
+                batch.len()
             );
             Ok::<(), String>(())
         })
@@ -180,13 +212,19 @@ pub async fn launch_submit_task(
 }
 
 #[tauri::command(rename_all = "snake_case")]
+#[expect(clippy::too_many_arguments)]
 pub async fn launch_update_task(
     app: tauri::AppHandle,
     state: State<'_, Arc<AppState>>,
-    codes: Vec<String>,
+    batch: Vec<String>,
+    with_image: bool,
+    headless: bool,
+    load_timeout: u64,
+    request_delay: u64,
+    webdriver_port: u16,
 ) -> Result<(), String> {
-    log::debug!("Launching update task for {} codes", codes.len());
-    log::debug!("Codes to update: {codes:?}");
+    log::debug!("Launching update task for {} codes", batch.len());
+    log::debug!("Codes to update: {batch:?}");
     let db = Arc::clone(&state.db);
 
     // Use a blocking thread to handle non-Send types
@@ -194,12 +232,25 @@ pub async fn launch_update_task(
         // Create a simple runtime for the async task
         let rt = tokio::runtime::Runtime::new().map_err(|e| e.to_string())?;
         rt.block_on(async move {
-            let task = Task::new_update(app, db, codes.clone()).await;
-            log::debug!("Update task created for {} codes", codes.len());
-            task.exec().await?;
+            let config = crate::handlers::BatchCrawlConfig::new(
+                batch.clone(),
+                with_image,
+                headless,
+                load_timeout,
+                request_delay,
+                webdriver_port,
+            )
+            .await
+            .map_err(|e| e.to_string())?;
+
+            let task = Task::new_update(app, db, config)
+                .await
+                .map_err(|e| e.to_string())?;
+            log::debug!("Update task created for {} codes", batch.len());
+            task.exec().await.map_err(|e| e.to_string())?;
             log::debug!(
                 "Update task completed successfully for {} codes",
-                codes.len()
+                batch.len()
             );
             Ok::<(), String>(())
         })

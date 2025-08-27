@@ -24,6 +24,8 @@ impl super::Task {
     }
 
     pub(super) async fn crawl_idol(&self) -> Result<(), AppError> {
+        log::debug!("Executing idol crawl task");
+
         let crawler = new_crawler().await?.start().await?;
         let mut client = new_postman().await?;
 

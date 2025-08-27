@@ -31,6 +31,8 @@ impl super::Task {
 
     #[expect(clippy::too_many_lines)]
     pub(super) async fn submit_codes(&self, codes: &[String]) -> Result<(), AppError> {
+        log::debug!("Executing submit crawl task for {} codes", codes.len());
+
         use luneth_db::record_local::Entity as RecordEntity;
         let mut client = new_postman().await?;
 
