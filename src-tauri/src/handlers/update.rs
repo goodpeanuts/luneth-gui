@@ -6,7 +6,7 @@ use serde::Serialize;
 use tauri::{AppHandle, Emitter as _};
 
 use crate::{
-    common::new_crawler,
+    common::new_crawler_with_config,
     db::log::{log_failed_op, log_success_op},
     handlers::{images::crawl_record_image, BatchCrawlConfig, TaskType},
     AppError,
@@ -30,9 +30,10 @@ impl super::Task {
     #[expect(clippy::too_many_lines)]
     pub async fn update_codes(&self, config: &BatchCrawlConfig) -> Result<(), AppError> {
         let batch = &config.batch;
+        let config = config.crawl_config.clone();
         log::debug!("Executing update crawl task for {} codes", batch.len());
 
-        let crawler = new_crawler().await?.start().await?;
+        let crawler = new_crawler_with_config(config).await?.start().await?;
         let mut update_count = 0;
         let mut success_count = 0;
         let mut error_count = 0;
