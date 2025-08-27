@@ -66,15 +66,8 @@ where
     let mut success_count = 0;
     let mut error_count = 0;
 
-    let exist = EXIST_IDS.write().await.fresh(db).await;
-
-    let exist_records = match exist {
-        Ok(()) => EXIST_IDS.read().await.ids.clone(),
-        Err(e) => {
-            log::error!("Failed to refresh existing record IDs: {e}");
-            Vec::new()
-        }
-    };
+    EXIST_IDS.write().await.fresh(db).await;
+    let exist_records = EXIST_IDS.read().await.ids.clone();
 
     // Send initial progress event - unified batch crawl start
     report_batch_crawl_start(app_handle, codes.len());

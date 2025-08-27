@@ -16,10 +16,11 @@ pub struct ExistIDs {
 }
 
 impl ExistIDs {
-    pub async fn fresh(&mut self, db: &impl DbService) -> Result<(), AppError> {
-        let new = get_exist_record_ids(db).await?;
-        self.ids = new;
-        Ok(())
+    pub async fn fresh(&mut self, db: &impl DbService) {
+        match get_exist_record_ids(db).await {
+            Ok(records) => self.ids = records,
+            Err(e) => log::error!("Failed to refresh existing record IDs: {e}"),
+        };
     }
 }
 
