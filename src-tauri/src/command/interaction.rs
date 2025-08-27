@@ -6,9 +6,19 @@ use luneth_db::entities::record_local::Model as RecorderModel;
 use tauri::{Manager as _, State};
 
 use crate::{
+    common::EXIST_IDS,
     db::read::{get_op_history, get_records_ordered_by_updated_at},
     AppState,
 };
+
+#[tauri::command(rename_all = "snake_case")]
+pub async fn get_all_exist_records(state: State<'_, Arc<AppState>>) -> Result<Vec<String>, String> {
+    let db = Arc::clone(&state.db);
+    EXIST_IDS.write().await.fresh(db.as_ref()).await;
+    let exist = EXIST_IDS.read().await.ids.clone();
+    log::info!("get {}", exist.len());
+    Ok(exist)
+}
 
 #[tauri::command(rename_all = "snake_case")]
 pub async fn get_all_records(

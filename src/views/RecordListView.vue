@@ -74,8 +74,8 @@
       <div class="empty-icon">📝</div>
       <p class="empty-text">No records found</p>
       <p class="empty-hint">Start crawling to create records</p>
-      <button class="crawl-btn" @click="navigateTo('crawl')">
-        Go to Crawl
+      <button class="crawl-btn" @click="navigateTo('task')">
+        Go to Tasks
       </button>
     </div>
 
