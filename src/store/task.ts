@@ -83,3 +83,14 @@ export function updateTaskMessage(taskType: 'idolCrawl' | 'recordPull' | 'submit
 export function updateTaskProgress(taskType: 'idolCrawl' | 'recordPull' | 'submit' | 'update', progress: ManageTaskProgress) {
   manageTaskState[taskType].progress = progress;
 }
+
+// 检查是否有任务正在运行
+export function isAnyTaskRunning(): boolean {
+  // 检查管理任务状态
+  const hasRunningManageTask = Object.values(manageTaskState).some(task => task.status === 'running');
+
+  // 检查爬取任务状态
+  const hasRunningScrapTask = scrapTaskState.isProcessing;
+
+  return hasRunningManageTask || hasRunningScrapTask;
+}

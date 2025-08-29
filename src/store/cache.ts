@@ -16,13 +16,19 @@ export const cacheState = reactive<CacheState>({
     timestamp: 0,
     isLoading: false,
   },
+  images: {},
 });
 
 // 缓存管理函数
 const CACHE_EXPIRE_TIME = 5 * 60 * 1000; // 5 minutes cache expiration time
+const IMAGE_CACHE_EXPIRE_TIME = 30 * 60 * 1000; // 30 minutes for images
 
 export function isCacheValid(timestamp: number): boolean {
   return Date.now() - timestamp < CACHE_EXPIRE_TIME;
+}
+
+export function isImageCacheValid(timestamp: number): boolean {
+  return Date.now() - timestamp < IMAGE_CACHE_EXPIRE_TIME;
 }
 
 export function setCachedRecords(records: RecordModel[]) {
@@ -31,10 +37,11 @@ export function setCachedRecords(records: RecordModel[]) {
 }
 
 export function getCachedRecords(): RecordModel[] {
-  if (isCacheValid(cacheState.records.timestamp)) {
-    return cacheState.records.data;
-  }
-  return [];
+  return cacheState.records.data; // 总是返回缓存的数据，不检查过期时间
+}
+
+export function isCachedRecordsValid(): boolean {
+  return cacheState.records.data.length > 0 && isCacheValid(cacheState.records.timestamp);
 }
 
 export function setCachedHistory(history: HistoryOpModel[]) {
@@ -63,4 +70,46 @@ export function updateRecordInCache(recordId: string, updates: Partial<RecordMod
   if (record) {
     Object.assign(record, updates);
   }
+}
+
+// 图片缓存管理函数
+export function setCachedImage(cacheKey: string, url: string, isLocal: boolean): void {
+  cacheState.images[cacheKey] = {
+    url,
+    isLocal,
+    timestamp: Date.now(),
+  };
+}
+
+export function getCachedImage(cacheKey: string): string | null {
+  const cached = cacheState.images[cacheKey];
+  if (cached && isImageCacheValid(cached.timestamp)) {
+    return cached.url;
+  }
+  return null;
+}
+
+export function getCachedImageInfo(cacheKey: string): { url: string; isLocal: boolean } | null {
+  const cached = cacheState.images[cacheKey];
+  if (cached && isImageCacheValid(cached.timestamp)) {
+    return { url: cached.url, isLocal: cached.isLocal };
+  }
+  return null;
+}
+
+export function removeCachedImage(cacheKey: string): void {
+  delete cacheState.images[cacheKey];
+}
+
+export function clearExpiredImageCache(): void {
+  Object.keys(cacheState.images).forEach(cacheKey => {
+    const cached = cacheState.images[cacheKey];
+    if (!isImageCacheValid(cached.timestamp)) {
+      // 如果是本地blob URL，需要释放
+      if (cached.isLocal && cached.url.startsWith('blob:')) {
+        URL.revokeObjectURL(cached.url);
+      }
+      delete cacheState.images[cacheKey];
+    }
+  });
 }

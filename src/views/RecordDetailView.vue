@@ -250,13 +250,15 @@ function handleImageError(event: Event) {
   flex: 1;
   display: flex;
   overflow: hidden;
+  min-height: 0; /* 添加最小高度约束 */
 }
 
 .record-images {
-  width: 60%;
+  width: 50%; /* 调整为50% */
   padding: 24px;
   overflow-y: auto;
   background-color: #f8f9fa;
+  flex-shrink: 0; /* 防止收缩 */
 }
 
 .cover-section {
@@ -330,10 +332,12 @@ function handleImageError(event: Event) {
 }
 
 .record-info {
-  width: 40%;
+  width: 50%; /* 调整为50% */
   display: flex;
   flex-direction: column;
   background: white;
+  min-width: 0; /* 添加最小宽度约束 */
+  flex-shrink: 0; /* 防止收缩 */
 }
 
 .tab-navigation {
@@ -369,5 +373,14 @@ function handleImageError(event: Event) {
   flex: 1;
   overflow-y: auto;
   padding: 24px;
+  min-height: 0; /* 重要：允许flex子项缩小 */
+}
+
+.info-tab {
+  height: 100%; /* 确保info tab占据全部高度 */
+}
+
+.links-tab {
+  height: 100%; /* 确保links tab占据全部高度 */
 }
 </style>

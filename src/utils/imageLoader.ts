@@ -1,4 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
+import { getCachedImageInfo, setCachedImage } from '@/store/cache';
 
 export interface ImageLoadResult {
   src: string;
@@ -17,6 +18,16 @@ export async function loadImage(
   imageIndex: number | null,
   remoteSrc: string
 ): Promise<ImageLoadResult> {
+  // 先检查缓存
+  const cacheKey = `${recordId}_${imageIndex}`;
+  const cachedInfo = getCachedImageInfo(cacheKey);
+  if (cachedInfo) {
+    return {
+      src: cachedInfo.url,
+      isLocal: cachedInfo.isLocal
+    };
+  }
+
   try {
     // 尝试从本地加载
     const localImageBytes = await invoke<number[] | null>('read_local_record_image', {
@@ -32,6 +43,9 @@ export async function loadImage(
       const blob = new Blob([uint8Array]);
       const localSrc = URL.createObjectURL(blob);
 
+      // 缓存结果
+      setCachedImage(cacheKey, localSrc, true);
+
       return {
         src: localSrc,
         isLocal: true
@@ -43,6 +57,9 @@ export async function loadImage(
 
   // 如果本地不存在或加载失败，使用远程 URL
   if (remoteSrc) {
+    // 缓存远程URL
+    setCachedImage(cacheKey, remoteSrc, false);
+
     return {
       src: remoteSrc,
       isLocal: false
