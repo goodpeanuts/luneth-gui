@@ -180,7 +180,7 @@
             <textarea
               v-model="codesInput"
               class="input-field textarea"
-              placeholder="Enter record IDs, one per line&#10;Example:&#10;ABC-123&#10;DEF-456&#10;GHI-789"
+              placeholder="Enter record IDs, one per line"
             />
             <div class="input-hint">
               Enter one record ID per line. Empty lines will be ignored.

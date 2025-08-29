@@ -10,7 +10,7 @@ export const progressState = reactive<ProgressState>({
 });
 
 // Progress item management functions
-export function createProgressItem(name: string, total: number = 0): ProgressItem {
+export function createProgressItem(name: string, total: number = -1): ProgressItem {
   const item: ProgressItem = {
     id: `${name}-${Date.now()}`,
     name,
@@ -19,7 +19,7 @@ export function createProgressItem(name: string, total: number = 0): ProgressIte
     status: 'pending',
     createdAt: Date.now(),
   };
-  progressState.progressList.push(item);
+  progressState.progressList.unshift(item); // 使用unshift在开头添加，最新的在上方
   progressState.isVisible = true;
   return item;
 }
