@@ -25,8 +25,7 @@ import type {
 import {
   progressState,
   findOrCreateProgress,
-  updateProgressStatus,
-  resetProgress
+  updateProgressStatus
 } from './progress';
 
 import {
@@ -69,8 +68,7 @@ export async function initializeGlobalEventListeners() {
           latestPageProgress.status = 'in-progress';
         }
       } else {
-        // Manual模式：清空所有进度条并创建新的
-        resetProgress();
+        // Manual模式：创建新的进度条，但不清空其他进度条
         const progress = findOrCreateProgress('Manual Crawl');
         progress.total = event.payload.totalCount;
         progress.current = 0;

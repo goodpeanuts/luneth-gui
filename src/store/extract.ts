@@ -51,7 +51,7 @@ export function updateFilteredOutput(): void {
       line => !extractState.existRecords.includes(line)
     );
   } else {
-    // 不过滤，显示所有结果
+    // 不过滤，显示所有结果 - 确保创建新数组避免引用问题
     extractState.filteredOutputLines = [...extractState.processResult.output_lines];
   }
 }

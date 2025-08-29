@@ -11,10 +11,10 @@
             </span>
           </div>
         </div>
-        <div class="text-area-container">
-          <div class="line-numbers" v-if="extractState.processResult || extractState.inputText">
+        <div class="text-area-container" ref="textAreaContainer">
+          <div class="line-numbers" v-if="extractState.processResult || extractState.inputText" ref="lineNumbers">
             <div
-              v-for="(line, index) in getDisplayLines()"
+              v-for="(_, index) in getDisplayLines()"
               :key="index"
               class="line-number"
             >
@@ -34,8 +34,10 @@
 • 身份证号：123456789012345678
 • 其他：至少6位数字字母组合"
             :readonly="extractState.isProcessing"
+            @scroll="handleTextareaScroll"
+            ref="textareaElement"
           ></textarea>
-          <div class="text-overlay" v-if="extractState.processResult">
+          <div class="text-overlay" v-if="extractState.processResult" @scroll="handleOverlayScroll" ref="textOverlay">
             <div
               v-for="line in extractState.processResult.input_lines"
               :key="line.line_number"
@@ -187,7 +189,7 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted } from "vue";
+import { onMounted, ref } from "vue";
 import { save } from "@tauri-apps/plugin-dialog";
 import { writeTextFile } from "@tauri-apps/plugin-fs";
 import {
@@ -214,6 +216,12 @@ interface LineResult {
   status: 'Normal' | 'Error' | 'Duplicate' | 'Selected';
 }
 
+// 模板引用
+const textAreaContainer = ref<HTMLElement>();
+const lineNumbers = ref<HTMLElement>();
+const textareaElement = ref<HTMLTextAreaElement>();
+const textOverlay = ref<HTMLElement>();
+
 // 组件初始化
 onMounted(async () => {
   // 初始化时获取已存在记录
@@ -221,6 +229,20 @@ onMounted(async () => {
     await fetchExistRecords();
   }
 });
+
+// 处理textarea滚动，同步行号滚动
+function handleTextareaScroll() {
+  if (textareaElement.value && lineNumbers.value) {
+    lineNumbers.value.scrollTop = textareaElement.value.scrollTop;
+  }
+}
+
+// 处理overlay滚动，同步行号滚动
+function handleOverlayScroll() {
+  if (textOverlay.value && lineNumbers.value) {
+    lineNumbers.value.scrollTop = textOverlay.value.scrollTop;
+  }
+}
 
 // 获取显示行数（用于行号显示）
 function getDisplayLines(): string[] {
@@ -455,7 +477,7 @@ function getLineTooltip(line: LineResult): string {
   font-size: 14px;
   line-height: 1.5;
   padding: 0;
-  overflow: hidden;
+  overflow: auto; /* 允许滚动 */
   color: #495057;
 }
 

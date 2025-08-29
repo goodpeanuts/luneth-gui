@@ -505,7 +505,6 @@ import {
   scrapTaskState,
   manageTaskState,
   showProgress as showProgressGlobal,
-  resetProgress,
   appState,
   updateTaskStatus
 } from '@/store';
@@ -576,7 +575,16 @@ onMounted(() => {
 
 // 检查是否有任务正在运行
 const isAnyTaskRunning = computed(() => {
-  return Object.values(manageTaskState).some(task => task.status === 'running') || isProcessing.value;
+  // 检查管理任务状态
+  const hasRunningManageTask = Object.values(manageTaskState).some(task => task.status === 'running');
+
+  // 检查爬取任务状态
+  const hasRunningScrapTask = scrapTaskState.isProcessing;
+
+  // 检查本地处理状态
+  const hasLocalProcessing = isProcessing.value;
+
+  return hasRunningManageTask || hasRunningScrapTask || hasLocalProcessing;
 });
 
 // 配置检查
@@ -722,14 +730,12 @@ const canLaunch = computed(() => {
 });
 
 // 监听任务类型变化
-watch(activeTask, (newTask, oldTask) => {
+watch(activeTask, () => {
   errorMessage.value = '';
   successMessage.value = '';
 
-  // 切换到batch模式时清空进度条，auto模式保留
-  if (newTask === 'batch' && oldTask !== 'batch') {
-    resetProgress();
-  }
+  // 注意：不要在这里清空进度条，保持所有进度条显示
+  // 只有在用户明确操作时才清空进度
 });
 
 // 监听输入变化，清空错误信息
