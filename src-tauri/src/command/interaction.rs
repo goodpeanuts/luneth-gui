@@ -7,7 +7,7 @@ use tauri::{Manager as _, State};
 
 use crate::{
     common::EXIST_IDS,
-    db::read::{get_op_history, get_records_ordered_by_updated_at},
+    db::read::{get_local_records, get_op_history, get_records_count},
     AppState,
 };
 
@@ -21,12 +21,28 @@ pub async fn get_all_exist_records(state: State<'_, Arc<AppState>>) -> Result<Ve
 }
 
 #[tauri::command(rename_all = "snake_case")]
-pub async fn get_all_records(
+pub async fn query_record_count(
     state: State<'_, Arc<AppState>>,
+    filters: Vec<String>,
+) -> Result<u64, String> {
+    let db = Arc::clone(&state.db);
+    let count = get_records_count(db.as_ref(), filters)
+        .await
+        .map_err(|e| e.to_string())?;
+    log::info!("Total record count: {count}");
+    Ok(count)
+}
+
+#[tauri::command(rename_all = "snake_case")]
+pub async fn get_local_records_paginator(
+    state: State<'_, Arc<AppState>>,
+    offset: u64,
+    limit: u64,
+    filters: Vec<String>,
 ) -> Result<Vec<RecorderModel>, String> {
     log::debug!("Fetching all records from database ordered by updated_at");
     let db = Arc::clone(&state.db);
-    let records = get_records_ordered_by_updated_at(db.as_ref())
+    let records = get_local_records(db.as_ref(), Some(offset), Some(limit), filters)
         .await
         .map_err(|e| e.to_string())?;
     log::info!("Retrieved {} records from database", records.len());

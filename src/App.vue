@@ -99,6 +99,7 @@ const currentViewComponent = computed(() => {
 
 // 初始化全局事件监听
 onMounted(async () => {
+  console.log('[App] App mounted, current view:', appState.currentView);
   console.log('[App] Initializing global event listeners');
   await initializeGlobalEventListeners();
 });

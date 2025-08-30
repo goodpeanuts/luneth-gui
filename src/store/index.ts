@@ -15,6 +15,9 @@ export * from './cache';
 // 记录相关
 export * from './record';
 
+// 分页状态
+export * from './pagination';
+
 // Extract 相关
 export * from './extract';
 

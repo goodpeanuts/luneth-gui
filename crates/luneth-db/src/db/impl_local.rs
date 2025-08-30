@@ -1,11 +1,60 @@
+use std::str::FromStr;
+
 use super::Result;
 use crate::entities::{
     record_local::ActiveModel as am, record_local::Entity as entity, record_local::Model as model,
 };
 use sea_orm::{
-    ActiveModelTrait as _, ColumnTrait, DatabaseConnection, EntityTrait as _, QueryFilter as _,
-    QueryOrder as _, QuerySelect as _, sea_query::IntoCondition,
+    ActiveModelTrait as _, ColumnTrait, Condition, DatabaseConnection, EntityTrait as _,
+    PaginatorTrait as _, QueryFilter as _, QuerySelect as _, sea_query::IntoCondition as _,
 };
+
+#[derive(Debug)]
+pub enum LocalFilterCondition {
+    Viewed,
+    Liked,
+    Submit,
+    Local,
+}
+
+impl LocalFilterCondition {
+    fn to_condition(&self) -> Condition {
+        match self {
+            Self::Viewed => crate::record_local::Column::Viewed
+                .eq(true)
+                .into_condition(),
+            Self::Liked => crate::record_local::Column::IsLiked
+                .eq(true)
+                .into_condition(),
+            Self::Submit => crate::record_local::Column::IsSubmitted
+                .eq(true)
+                .into_condition(),
+            Self::Local => crate::record_local::Column::IsCachedLocally
+                .eq(true)
+                .into_condition(),
+        }
+    }
+}
+
+fn to_conditions(filters: Vec<LocalFilterCondition>) -> Condition {
+    filters
+        .into_iter()
+        .fold(Condition::all(), |acc, cond| acc.add(cond.to_condition()))
+}
+
+impl FromStr for LocalFilterCondition {
+    type Err = String;
+
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+        match s {
+            "viewed" => Ok(Self::Viewed),
+            "liked" => Ok(Self::Liked),
+            "submit" => Ok(Self::Submit),
+            "local" => Ok(Self::Local),
+            _ => Err(format!("Invalid filter condition: {s}")),
+        }
+    }
+}
 
 impl super::DbOperator {
     /// 获取数据库连接
@@ -35,32 +84,25 @@ impl super::DbOperator {
         }
     }
 
-    pub async fn query_local(&self, offset: Option<u64>, limit: Option<u64>) -> Result<Vec<model>> {
-        let mut query = entity::find();
+    pub async fn query_total_count(&self, filters: Vec<LocalFilterCondition>) -> Result<u64> {
+        let condition = to_conditions(filters);
 
-        if let Some(offset) = offset {
-            query = query.offset(offset);
-        }
-
-        if let Some(limit) = limit {
-            query = query.limit(limit);
-        }
-
-        let results = query.all(&self.db).await?;
-        Ok(results)
+        let query = entity::find().filter(condition);
+        let count = query.count(&self.db).await?;
+        Ok(count)
     }
 
-    /// 根据过滤条件查询记录
-    pub async fn query_local_by_filter<F>(
+    /// 根据过滤条件查询记录-
+    pub async fn query_local(
         &self,
-        filter: F,
         offset: Option<u64>,
         limit: Option<u64>,
+        filters: Vec<LocalFilterCondition>,
     ) -> Result<Vec<model>>
-    where
-        F: IntoCondition,
-    {
-        let mut query = entity::find().filter(filter);
+where {
+        let condition = to_conditions(filters);
+
+        let mut query = entity::find().filter(condition);
 
         if let Some(offset) = offset {
             query = query.offset(offset);
@@ -108,13 +150,5 @@ where {
             .await?;
 
         Ok(results)
-    }
-
-    pub async fn get_records_ordered_by_updated_at(&self) -> Result<Vec<model>> {
-        let records = entity::find()
-            .order_by_desc(crate::record_local::Column::UpdatedAt)
-            .all(&self.db)
-            .await?;
-        Ok(records)
     }
 }

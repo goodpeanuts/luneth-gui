@@ -1,22 +1,37 @@
 use luneth_db::entities::record_local::Model as RecorderModel;
+use luneth_db::impl_local::LocalFilterCondition;
 use luneth_db::{history_op, DbOperator};
 
 use crate::AppError;
 
-#[expect(unused)]
-pub(crate) async fn get_records(db: &DbOperator) -> Result<Vec<RecorderModel>, AppError> {
-    log::debug!("Querying all records from database");
-    let records = db.query_local(None, None).await?;
-    log::debug!("Successfully retrieved {} records", records.len());
-    Ok(records)
+pub(crate) async fn get_records_count(
+    db: &DbOperator,
+    filters: Vec<String>,
+) -> Result<u64, AppError> {
+    let filters = filters
+        .into_iter()
+        .filter_map(|f| f.parse().ok())
+        .collect::<Vec<LocalFilterCondition>>();
+    log::debug!("Querying records count from database, filter by {filters:?}");
+    let count = db.query_total_count(filters).await?;
+    log::debug!("Successfully retrieved records count {count}");
+
+    Ok(count)
 }
 
-pub(crate) async fn get_records_ordered_by_updated_at(
+pub(crate) async fn get_local_records(
     db: &DbOperator,
+    offset: Option<u64>,
+    limit: Option<u64>,
+    filters: Vec<String>,
 ) -> Result<Vec<RecorderModel>, AppError> {
-    log::debug!("Querying all records from database ordered by updated_at desc");
-
-    let records = db.get_records_ordered_by_updated_at().await?;
+    let filters = filters
+        .into_iter()
+        .filter_map(|f| f.parse().ok())
+        .collect::<Vec<LocalFilterCondition>>();
+    log::debug!("Querying records count from database, filter by {filters:?}");
+    let records = db.query_local(offset, limit, filters).await?;
+    log::debug!("Successfully retrieved {} records", records.len());
     Ok(records)
 }
 

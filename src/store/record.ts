@@ -3,8 +3,8 @@
 import { reactive } from 'vue';
 import { invoke } from '@tauri-apps/api/core';
 import type { RecordFilterOptions, RecordModel } from '@/types/record';
-import { updateRecordInCache } from './cache';
 import { appState } from './app';
+import { paginationState } from './pagination';
 
 // 记录筛选状态
 export const recordFilterState = reactive<RecordFilterOptions>({
@@ -61,13 +61,21 @@ export function getFilteredRecords(records: RecordModel[]): RecordModel[] {
   });
 }
 
+// 更新分页状态中的单个记录
+function updateRecordInPagination(recordId: string, updates: Partial<RecordModel>): void {
+  const record = paginationState.records.find(r => r.id === recordId);
+  if (record) {
+    Object.assign(record, updates);
+  }
+}
+
 // 记录交互功能
 export async function markRecordViewed(recordId: string): Promise<void> {
   try {
     await invoke('mark_record_viewed', { code: recordId });
 
-    // 更新本地状态
-    updateRecordInCache(recordId, { viewed: true });
+    // 更新分页状态中的记录
+    updateRecordInPagination(recordId, { viewed: true });
 
     // 如果当前选中的记录是这个，也要更新
     if (appState.selectedRecord?.id === recordId) {
@@ -83,8 +91,8 @@ export async function markRecordLiked(recordId: string): Promise<void> {
   try {
     await invoke('mark_record_liked', { code: recordId });
 
-    // 更新本地状态
-    updateRecordInCache(recordId, { is_liked: true });
+    // 更新分页状态中的记录
+    updateRecordInPagination(recordId, { is_liked: true });
 
     // 如果当前选中的记录是这个，也要更新
     if (appState.selectedRecord?.id === recordId) {
@@ -100,8 +108,8 @@ export async function markRecordUnliked(recordId: string): Promise<void> {
   try {
     await invoke('mark_record_unliked', { code: recordId });
 
-    // 更新本地状态
-    updateRecordInCache(recordId, { is_liked: false });
+    // 更新分页状态中的记录
+    updateRecordInPagination(recordId, { is_liked: false });
 
     // 如果当前选中的记录是这个，也要更新
     if (appState.selectedRecord?.id === recordId) {
