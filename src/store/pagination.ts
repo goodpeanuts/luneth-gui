@@ -57,11 +57,6 @@ function buildFilters(): string[] {
     filters.push('local');
   }
 
-  // TODO: 搜索功能暂时未实现
-  // if (paginationState.searchQuery.trim()) {
-  //   filters.push(`search:${paginationState.searchQuery.trim()}`);
-  // }
-
   return filters;
 }
 
@@ -74,15 +69,30 @@ function calculateTotalPages(totalCount: number, pageSize: number): number {
 export async function fetchRecordCount(): Promise<void> {
   try {
     const filters = buildFilters();
-    console.log('[Pagination] Querying record count with filters:', filters);
+    const hasSearchQuery = paginationState.searchQuery.trim() !== '';
+    console.log('[Pagination] Querying record count with filters:', filters, 'search:', hasSearchQuery ? paginationState.searchQuery : 'none');
 
-    // 获取过滤后的记录数
-    const count = await invoke<number>('query_record_count', { filters });
+    let count: number;
+
+    if (hasSearchQuery) {
+      // 使用搜索命令获取计数，调用搜索但只取第一个元素（计数）
+      const searchResult = await invoke<[number, RecordModel[]]>('search_records', {
+        name: paginationState.searchQuery.trim(),
+        offset: 0,
+        limit: 1, // 只需要计数，所以限制为1条记录
+        filters,
+      });
+      count = searchResult[0];
+    } else {
+      // 获取过滤后的记录数
+      count = await invoke<number>('query_record_count', { filters });
+    }
+
     console.log('[Pagination] Filtered record count result:', count);
     paginationState.totalCount = count;
     paginationState.totalPages = calculateTotalPages(count, paginationState.pageSize);
 
-    // 获取总记录数（无过滤）
+    // 获取总记录数（无过滤和搜索）
     const totalCount = await invoke<number>('query_record_count', { filters: [] });
     console.log('[Pagination] Total record count result:', totalCount);
     paginationState.totalRecordsCount = totalCount;
@@ -116,12 +126,27 @@ export async function fetchCurrentPageRecords(): Promise<void> {
     const filters = buildFilters();
     console.log(`[Pagination] Fetching records with offset: ${offset}, limit: ${paginationState.pageSize}, filters:`, filters);
 
-    // 获取记录
-    const records = await invoke<RecordModel[]>('get_local_records_paginator', {
-      offset,
-      limit: paginationState.pageSize,
-      filters,
-    });
+    // 获取记录 - 根据是否有搜索查询决定使用哪个命令
+    let records: RecordModel[];
+    const hasSearchQuery = paginationState.searchQuery.trim() !== '';
+
+    if (hasSearchQuery) {
+      console.log(`[Pagination] Using search with query: "${paginationState.searchQuery}"`);
+      const searchResult = await invoke<[number, RecordModel[]]>('search_records', {
+        name: paginationState.searchQuery.trim(),
+        offset,
+        limit: paginationState.pageSize,
+        filters,
+      });
+      // 注意：search_records 返回 (count, records) 元组，但这里的 count 应该与 fetchRecordCount 中获取的一致
+      records = searchResult[1];
+    } else {
+      records = await invoke<RecordModel[]>('get_local_records_paginator', {
+        offset,
+        limit: paginationState.pageSize,
+        filters,
+      });
+    }
 
     paginationState.records = records;
     console.log(`[Pagination] Loaded page ${paginationState.currentPage}, ${records.length} records`);
@@ -161,6 +186,14 @@ export async function prevPage(): Promise<void> {
 // 设置搜索查询
 export function setSearchQuery(query: string): void {
   paginationState.searchQuery = query;
+}
+
+// 执行搜索并重新加载数据
+export async function performSearch(query: string): Promise<void> {
+  console.log(`[Pagination] Performing search with query: "${query}"`);
+  paginationState.searchQuery = query;
+  paginationState.currentPage = 1; // 搜索时重置到第一页
+  await fetchCurrentPageRecords();
 }
 
 // 设置过滤器

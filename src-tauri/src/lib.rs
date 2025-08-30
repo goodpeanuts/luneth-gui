@@ -26,7 +26,7 @@ use crate::command::{
     image::{get_app_local_data_dir, read_local_record_image},
     interaction::{
         get_all_exist_records, get_all_op_history, get_local_records_paginator, mark_record_liked,
-        mark_record_unliked, mark_record_viewed, query_record_count,
+        mark_record_unliked, mark_record_viewed, query_record_count, search_records,
     },
     log::get_log_dir,
     task::{
@@ -169,6 +169,7 @@ pub fn run() {
             process_text,
             toggle_line_selection,
             export_to_file,
+            search_records,
             get_local_records_paginator,
             query_record_count,
             launch_auto_scrap_task,

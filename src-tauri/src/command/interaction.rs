@@ -7,7 +7,7 @@ use tauri::{Manager as _, State};
 
 use crate::{
     common::EXIST_IDS,
-    db::read::{get_local_records, get_op_history, get_records_count},
+    db::read::{get_local_records, get_op_history, get_records_count, search_local_records},
     AppState,
 };
 
@@ -31,6 +31,22 @@ pub async fn query_record_count(
         .map_err(|e| e.to_string())?;
     log::info!("Total record count: {count}");
     Ok(count)
+}
+
+#[tauri::command(rename_all = "snake_case")]
+pub async fn search_records(
+    state: State<'_, Arc<AppState>>,
+    name: String,
+    offset: Option<u64>,
+    limit: Option<u64>,
+    filters: Vec<String>,
+) -> Result<(u64, Vec<RecorderModel>), String> {
+    let db = Arc::clone(&state.db);
+    let (count, records) = search_local_records(db.as_ref(), name, offset, limit, filters)
+        .await
+        .map_err(|e| e.to_string())?;
+    log::info!("Retrieved {} records from database", records.len());
+    Ok((count, records))
 }
 
 #[tauri::command(rename_all = "snake_case")]

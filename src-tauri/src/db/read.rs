@@ -35,6 +35,23 @@ pub(crate) async fn get_local_records(
     Ok(records)
 }
 
+pub(crate) async fn search_local_records(
+    db: &DbOperator,
+    name: String,
+    offset: Option<u64>,
+    limit: Option<u64>,
+    filters: Vec<String>,
+) -> Result<(u64, Vec<RecorderModel>), AppError> {
+    let filters = filters
+        .into_iter()
+        .filter_map(|f| f.parse().ok())
+        .collect::<Vec<LocalFilterCondition>>();
+    log::debug!("Querying records count from database, filter by {filters:?}");
+    let (count, records) = db.search_local(name, offset, limit, filters).await?;
+    log::debug!("Successfully retrieved {} records", records.len());
+    Ok((count, records))
+}
+
 // TODO: Op errortype display
 pub(crate) async fn get_op_history(db: &DbOperator) -> Result<Vec<history_op::Model>, AppError> {
     log::debug!("Querying operation history from database");

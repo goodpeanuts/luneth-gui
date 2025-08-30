@@ -18,11 +18,7 @@
             type="text"
             placeholder="Search records..."
             class="search-input"
-            @keyup.enter="applyFiltersAndSearch"
           />
-          <button class="search-btn" @click="applyFiltersAndSearch">
-            🔍
-          </button>
         </div>
 
         <!-- Filter Buttons -->
@@ -70,7 +66,7 @@
       </div>
 
       <!-- Filter Results Info -->
-      <div class="filter-results" v-if="hasActiveFilters && !paginationState.isLoading">
+      <div class="filter-results" v-if="!paginationState.isLoading">
         <span class="filter-results-text">
           Showing {{ paginationState.totalCount }} out of {{ paginationState.totalRecordsCount }} records
           <span v-if="paginationState.searchQuery" class="search-indicator">
@@ -188,6 +184,7 @@ import {
   nextPage,
   prevPage,
   setSearchQuery,
+  performSearch,
   clearFilters,
   applyFiltersAndReload,
   applyFilterImmediately,
@@ -211,9 +208,37 @@ const hasActiveFilters = computed(() => {
   );
 });
 
-// 监听搜索查询的变化，同步到分页状态
-watch(searchQuery, (newValue) => {
+// 搜索防抖时间（毫秒）
+const SEARCH_DEBOUNCE_TIME = 300;
+let searchTimeoutId: number | null = null;
+
+// 监听搜索查询的变化，使用防抖进行搜索
+watch(searchQuery, (newValue, oldValue) => {
+  // 清除之前的定时器
+  if (searchTimeoutId !== null) {
+    clearTimeout(searchTimeoutId);
+  }
+
+  // 立即更新分页状态中的搜索查询
   setSearchQuery(newValue);
+
+  // 如果搜索内容没有变化，不需要重新搜索
+  if (newValue.trim() === oldValue?.trim()) {
+    return;
+  }
+
+  console.log(`[RecordListView] Search query changed to: "${newValue}"`);
+
+  // 设置防抖定时器
+  searchTimeoutId = window.setTimeout(async () => {
+    try {
+      console.log(`[RecordListView] Performing debounced search: "${newValue}"`);
+      await performSearch(newValue);
+    } catch (error) {
+      console.error('[RecordListView] Search failed:', error);
+    }
+    searchTimeoutId = null;
+  }, SEARCH_DEBOUNCE_TIME);
 });
 
 // 初始化时从分页状态恢复搜索查询
@@ -275,6 +300,12 @@ watch(
 );
 
 onUnmounted(() => {
+  // 清理搜索防抖定时器
+  if (searchTimeoutId !== null) {
+    clearTimeout(searchTimeoutId);
+    searchTimeoutId = null;
+  }
+
   // Revoke any blob URLs to avoid memory leaks
   for (const id in coverUrls.value) {
     const url = coverUrls.value[id];
@@ -339,10 +370,6 @@ async function toggleFilter(filterKey: keyof RecordFilterOptions, value: boolean
 
   // 立即应用过滤器
   await applyFilterImmediately(filterKey, newValue);
-}
-
-async function applyFiltersAndSearch() {
-  await applyFiltersAndReload();
 }
 
 async function clearAllFilters() {
@@ -440,21 +467,6 @@ async function refreshData() {
 .search-input:focus {
   outline: none;
   border-color: #007bff;
-}
-
-.search-btn {
-  padding: 8px 12px;
-  background: #007bff;
-  color: white;
-  border: none;
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 0.9rem;
-  transition: background-color 0.2s ease;
-}
-
-.search-btn:hover {
-  background: #0056b3;
 }
 
 /* 过滤按钮样式 */

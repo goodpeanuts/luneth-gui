@@ -92,6 +92,34 @@ impl super::DbOperator {
         Ok(count)
     }
 
+    pub async fn search_local(
+        &self,
+        name: String,
+        offset: Option<u64>,
+        limit: Option<u64>,
+        filters: Vec<LocalFilterCondition>,
+    ) -> Result<(u64, Vec<model>)> {
+        let condition = to_conditions(filters).add(
+            crate::record_local::Column::Id
+                .like(format!("%{name}%"))
+                .into_condition(),
+        );
+
+        let mut query = entity::find().filter(condition);
+
+        if let Some(offset) = offset {
+            query = query.offset(offset);
+        }
+
+        if let Some(limit) = limit {
+            query = query.limit(limit);
+        }
+
+        let results = query.clone().all(&self.db).await?;
+        let count = query.count(&self.db).await?;
+        Ok((count, results))
+    }
+
     /// 根据过滤条件查询记录-
     pub async fn query_local(
         &self,
