@@ -13,5 +13,5 @@ pub use db::*;
 pub use types::*;
 
 // 重新导出实体模块供外部使用
-pub use crate::db::service::DbService;
+// pub use crate::db::service::DbService;
 pub use entities::*;

@@ -1,5 +1,4 @@
-use luneth_db::DbService;
-use luneth_db::OperationType;
+use luneth_db::{DbOperator, OperationType};
 
 use crate::AppError;
 
@@ -7,7 +6,7 @@ use crate::AppError;
 // # client
 // #############
 pub(crate) async fn save_remote_records(
-    db: &impl DbService,
+    db: &DbOperator,
     records: Vec<luneth::common::RecordSlimDto>,
 ) -> Result<usize, AppError> {
     log::debug!("Saving {} remote records to local database", records.len());
@@ -15,7 +14,7 @@ pub(crate) async fn save_remote_records(
     for record in records {
         let id = record.id.clone();
         let active_model = luneth_db::entities::record_remote::ActiveModel::from(record);
-        match db.insert_entity(active_model).await {
+        match db.insert_remote(active_model).await {
             Ok(_) => success_cnt += 1,
             Err(e) => {
                 if e.to_string().contains("UNIQUE constraint") {
@@ -31,11 +30,10 @@ pub(crate) async fn save_remote_records(
     Ok(success_cnt)
 }
 
-pub(crate) async fn mark_record_viewed(db: &impl DbService, code: &str) -> Result<(), AppError> {
+pub(crate) async fn mark_record_viewed(db: &DbOperator, code: &str) -> Result<(), AppError> {
     log::debug!("Marking record as viewed: {code}");
-    use luneth_db::entities::record_local::Entity as RecordLocal;
 
-    let record_local = db.find_record_local_by_id::<RecordLocal>(code).await?;
+    let record_local = db.find_record_local_by_id(code).await?;
 
     if let Some(record) = record_local {
         let viewed_am = record.set_viewd(true);
@@ -55,11 +53,10 @@ pub(crate) async fn mark_record_viewed(db: &impl DbService, code: &str) -> Resul
     Ok(())
 }
 
-pub(crate) async fn mark_record_liked(db: &impl DbService, code: &str) -> Result<(), AppError> {
+pub(crate) async fn mark_record_liked(db: &DbOperator, code: &str) -> Result<(), AppError> {
     log::debug!("Marking record as liked: {code}");
-    use luneth_db::entities::record_local::Entity as RecordLocal;
 
-    let record_local = db.find_record_local_by_id::<RecordLocal>(code).await?;
+    let record_local = db.find_record_local_by_id(code).await?;
 
     if let Some(record) = record_local {
         let liked_am = record.set_liked(true);
@@ -79,11 +76,10 @@ pub(crate) async fn mark_record_liked(db: &impl DbService, code: &str) -> Result
     Ok(())
 }
 
-pub(crate) async fn mark_record_unliked(db: &impl DbService, code: &str) -> Result<(), AppError> {
+pub(crate) async fn mark_record_unliked(db: &DbOperator, code: &str) -> Result<(), AppError> {
     log::debug!("Marking record as unliked: {code}");
-    use luneth_db::entities::record_local::Entity as RecordLocal;
 
-    let record_local = db.find_record_local_by_id::<RecordLocal>(code).await?;
+    let record_local = db.find_record_local_by_id(code).await?;
 
     if let Some(record) = record_local {
         let unliked_am = record.set_liked(false);
@@ -103,11 +99,10 @@ pub(crate) async fn mark_record_unliked(db: &impl DbService, code: &str) -> Resu
     Ok(())
 }
 
-pub(crate) async fn mark_record_submitted(db: &impl DbService, code: &str) -> Result<(), AppError> {
+pub(crate) async fn mark_record_submitted(db: &DbOperator, code: &str) -> Result<(), AppError> {
     log::debug!("Marking record as submitted: {code}");
-    use luneth_db::entities::record_local::Entity as RecordLocal;
 
-    let record_local = db.find_record_local_by_id::<RecordLocal>(code).await?;
+    let record_local = db.find_record_local_by_id(code).await?;
 
     if let Some(record) = record_local {
         let submitted_am = record.set_submitted(true);

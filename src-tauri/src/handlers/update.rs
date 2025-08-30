@@ -1,7 +1,7 @@
 use std::{ops::Not as _, sync::Arc};
 
 use luneth::crawl::CrawlInput;
-use luneth_db::{DbOperator, DbService as _};
+use luneth_db::DbOperator;
 use serde::Serialize;
 use tauri::{AppHandle, Emitter as _};
 
@@ -51,12 +51,7 @@ impl super::Task {
             let code = input.get_code().to_owned();
             match crawler.crawl_recorder(input).await {
                 Ok(recorder) => {
-                    use luneth_db::record_local::Entity as RecordEntity;
-                    let Some(local_record) = self
-                        .db
-                        .find_record_local_by_id::<RecordEntity>(&code)
-                        .await?
-                    else {
+                    let Some(local_record) = self.db.find_record_local_by_id(&code).await? else {
                         log::error!("Record {code} not found in local database, skipping update");
                         log_failed_op(
                             self.db.as_ref(),

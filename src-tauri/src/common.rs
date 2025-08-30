@@ -4,7 +4,7 @@ use luneth::{
     client::Postman,
     crawl::{CrawlConfig, WebCrawler},
 };
-use luneth_db::DbService;
+use luneth_db::DbOperator;
 use tauri::{AppHandle, Manager as _};
 use tokio::sync::{Mutex, RwLock};
 
@@ -19,7 +19,7 @@ pub struct ExistIDs {
 }
 
 impl ExistIDs {
-    pub async fn fresh(&mut self, db: &impl DbService) {
+    pub async fn fresh(&mut self, db: &DbOperator) {
         match get_exist_record_ids(db).await {
             Ok(records) => self.ids = records,
             Err(e) => log::error!("Failed to refresh existing record IDs: {e}"),

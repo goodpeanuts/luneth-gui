@@ -1,9 +1,9 @@
-use luneth_db::{history_op, DbService, OperationStatus, OperationType};
+use luneth_db::{history_op, DbOperator, OperationStatus, OperationType};
 
 use crate::AppError;
 
 pub(crate) async fn log_success_op(
-    db: &impl DbService,
+    db: &DbOperator,
     op_type: OperationType,
     code: &str,
 ) -> Result<(), AppError> {
@@ -16,12 +16,12 @@ pub(crate) async fn log_success_op(
         None,                     // Option<String> 错误信息
     );
 
-    db.insert_entity(op_history_entry).await?;
+    db.insert_history_op(op_history_entry).await?;
     Ok(())
 }
 
 pub(crate) async fn log_failed_op(
-    db: &impl DbService,
+    db: &DbOperator,
     op_type: OperationType,
     code: &str,
     err: String,
@@ -35,6 +35,6 @@ pub(crate) async fn log_failed_op(
         Some(err),               // Option<String> 错误信息
     );
 
-    db.insert_entity(op_history_entry).await?;
+    db.insert_history_op(op_history_entry).await?;
     Ok(())
 }

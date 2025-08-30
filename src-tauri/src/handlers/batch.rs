@@ -12,7 +12,7 @@ use crate::handlers::images::crawl_record_image;
 use crate::handlers::{BatchCrawlConfig, TaskType};
 use crate::AppError;
 use luneth_db::entities::record_local::Model as RecorderModel;
-use luneth_db::{DbOperator, DbService, OperationType};
+use luneth_db::{DbOperator, OperationType};
 
 impl super::Task {
     #[expect(clippy::too_many_arguments)]
@@ -74,7 +74,7 @@ impl super::Task {
 
 pub async fn crawl_codes(
     app_handle: &AppHandle,
-    db: &impl DbService,
+    db: &DbOperator,
     crawler: &WebCrawler,
     inputs: Vec<CrawlInput>,
     with_image: bool,
@@ -116,7 +116,7 @@ pub async fn crawl_codes(
                     RecorderModel::from_recorder(&record)
                 };
 
-                let insert_result = db.insert_entity(record_model).await;
+                let insert_result = db.insert_local(record_model).await;
 
                 match insert_result {
                     Ok(_) => {

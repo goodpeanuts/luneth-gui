@@ -8,7 +8,7 @@ use crate::{
     db::log::{log_failed_op, log_success_op},
     handlers::{AppError, AutoCrawlConfig, TaskType},
 };
-use luneth_db::{DbOperator, DbService, OperationType};
+use luneth_db::{DbOperator, OperationType};
 
 // XXX: conditionally stop
 const MAX_ITER_DEPTH: usize = 120;
@@ -51,7 +51,7 @@ impl super::Task {
 
 async fn auto_crawl_page(
     app_handle: &AppHandle,
-    db: &impl DbService,
+    db: &DbOperator,
     config: &AutoCrawlConfig,
 ) -> Result<(), AppError> {
     let start_url = config.start_url.clone();

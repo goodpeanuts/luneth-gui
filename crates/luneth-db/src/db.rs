@@ -1,17 +1,17 @@
 use crate::types::DbError;
 use sea_orm::{
-    ActiveModelTrait, ConnectOptions, ConnectionTrait as _, Database, DatabaseConnection,
-    DbBackend, EntityTrait, Schema, Statement,
+    ConnectOptions, ConnectionTrait as _, Database, DatabaseConnection, DbBackend,
+    EntityTrait as _, Schema, Statement,
 };
 use tauri::{AppHandle, Manager as _};
 
 use crate::entities::{history_op, history_task, record_local, record_remote};
 
-pub mod impl_db;
-pub mod service;
+pub mod impl_history;
+pub mod impl_local;
+pub mod impl_remote;
 
 type Result<T> = std::result::Result<T, DbError>;
-type Model<AM> = <<AM as ActiveModelTrait>::Entity as EntityTrait>::Model;
 
 /// 数据库操作器
 pub struct DbOperator {
