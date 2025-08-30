@@ -66,7 +66,7 @@ pub(crate) async fn get_op_history(db: &DbOperator) -> Result<Vec<history_op::Mo
 pub(crate) async fn get_remote_record_id(db: &DbOperator) -> Result<Vec<String>, AppError> {
     log::debug!("Querying all remote record IDs from database");
     let ids = db
-        .query_specified_column(luneth_db::record_remote::Column::Id)
+        .query_remote_specified_column(luneth_db::record_remote::Column::Id)
         .await?;
     log::debug!("Successfully retrieved {} remote record IDs", ids.len());
     Ok(ids)
@@ -75,7 +75,7 @@ pub(crate) async fn get_remote_record_id(db: &DbOperator) -> Result<Vec<String>,
 pub(crate) async fn get_local_record_id(db: &DbOperator) -> Result<Vec<String>, AppError> {
     log::debug!("Querying all local record IDs from database");
     let ids = db
-        .query_specified_column(luneth_db::record_local::Column::Id)
+        .query_local_specified_column(luneth_db::record_local::Column::Id)
         .await?;
     log::debug!("Successfully retrieved {} local record IDs", ids.len());
     Ok(ids)

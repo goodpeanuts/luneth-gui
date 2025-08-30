@@ -893,7 +893,7 @@ async function handleBatchScraping() {
   scrapTaskState.isProcessing = true;
 
   const params = {
-    codes,
+    batch: codes,
     with_image: config.value.withImage,
     headless: config.value.headless,
     load_timeout: config.value.loadTimeout,

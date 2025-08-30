@@ -225,7 +225,6 @@ interface LineResult {
 }
 
 // 模板引用
-const textAreaContainer = ref<HTMLElement>();
 const lineNumbers = ref<HTMLElement>();
 const textareaElement = ref<HTMLTextAreaElement>();
 const textDisplay = ref<HTMLElement>();

@@ -6,7 +6,8 @@ use crate::entities::{
 };
 use sea_orm::{
     ActiveModelTrait as _, ColumnTrait, Condition, DatabaseConnection, EntityTrait as _,
-    PaginatorTrait as _, QueryFilter as _, QuerySelect as _, sea_query::IntoCondition as _,
+    PaginatorTrait as _, QueryFilter as _, QueryOrder as _, QuerySelect as _,
+    sea_query::IntoCondition as _,
 };
 
 #[derive(Debug)]
@@ -105,7 +106,9 @@ impl super::DbOperator {
                 .into_condition(),
         );
 
-        let mut query = entity::find().filter(condition);
+        let mut query = entity::find()
+            .filter(condition)
+            .order_by_desc(crate::record_local::Column::CreatedAt);
 
         if let Some(offset) = offset {
             query = query.offset(offset);
@@ -129,7 +132,9 @@ impl super::DbOperator {
     ) -> Result<Vec<model>> {
         let condition = to_conditions(filters);
 
-        let mut query = entity::find().filter(condition);
+        let mut query = entity::find()
+            .filter(condition)
+            .order_by_desc(crate::record_local::Column::CreatedAt);
 
         if let Some(offset) = offset {
             query = query.offset(offset);
@@ -162,7 +167,7 @@ impl super::DbOperator {
     }
 
     /// Query specified column values from an entity table
-    pub async fn query_specified_column<C, T>(&self, column: C) -> Result<Vec<T>>
+    pub async fn query_local_specified_column<C, T>(&self, column: C) -> Result<Vec<T>>
     where
         C: ColumnTrait,
         T: sea_orm::TryGetable + Send,

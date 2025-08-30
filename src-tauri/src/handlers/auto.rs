@@ -11,7 +11,7 @@ use crate::{
 use luneth_db::{DbOperator, OperationType};
 
 // XXX: conditionally stop
-const MAX_ITER_DEPTH: usize = 120;
+const MAX_ITER_DEPTH: usize = 213;
 
 impl super::Task {
     #[expect(clippy::too_many_arguments)]
@@ -116,6 +116,10 @@ async fn auto_crawl_page(
     }
 
     log::info!("Auto crawl completed for URL: {start_url}");
+
+    // Send auto crawl complete event to frontend
+    report_auto_crawl_complete(app_handle);
+
     Ok(())
 }
 
@@ -142,6 +146,12 @@ struct CrawlPageSuccessEvent {
 struct CrawlPageFailedEvent {
     pub page_name: String,
     pub error_message: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct AutoCrawlCompleteEvent {
+    pub message: String,
 }
 
 fn report_crawl_page_start(app_handle: &AppHandle, page_name: &str) {
@@ -177,5 +187,15 @@ fn report_crawl_page_failed(app_handle: &AppHandle, page_name: &str, error_messa
     match app_handle.emit("crawl-page-failed", &event) {
         Ok(_) => log::debug!("Emitted crawl-page-failed event for {page_name}"),
         Err(e) => log::error!("Failed to emit crawl-page-failed event: {e}"),
+    }
+}
+
+fn report_auto_crawl_complete(app_handle: &AppHandle) {
+    let event = AutoCrawlCompleteEvent {
+        message: "Auto crawl task completed successfully".to_owned(),
+    };
+    match app_handle.emit("auto-crawl-complete", &event) {
+        Ok(_) => log::debug!("Emitted auto-crawl-complete event"),
+        Err(e) => log::error!("Failed to emit auto-crawl-complete event: {e}"),
     }
 }

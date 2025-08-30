@@ -30,8 +30,14 @@
           <!-- Cover Image -->
           <div class="cover-section">
             <div class="cover-container">
-              <img v-if="coverImageSrc" :src="coverImageSrc" :alt="record.title" class="cover-image"
-                @error="handleImageError" />
+              <img
+                v-if="coverImageSrc"
+                :src="coverImageSrc"
+                :alt="record.title"
+                class="cover-image"
+                @error="handleImageError"
+                @click="showImagePreview(coverImageSrc)"
+              />
               <div v-else class="cover-placeholder">
                 <span>🎬</span>
                 <p>No cover image</p>
@@ -44,7 +50,13 @@
             <h3 class="samples-title">Sample Images</h3>
             <div class="samples-grid">
               <div v-for="(imageUrl, index) in sampleImageSrcs" :key="index" class="sample-item">
-                <img :src="imageUrl" :alt="`Sample ${index + 1}`" class="sample-image" @error="handleImageError" />
+                <img
+                  :src="imageUrl"
+                  :alt="`Sample ${index + 1}`"
+                  class="sample-image"
+                  @error="handleImageError"
+                  @click="showImagePreview(imageUrl)"
+                />
               </div>
             </div>
           </div>
@@ -66,7 +78,7 @@
           <div class="tab-content">
             <!-- Info Tab -->
             <div v-if="activeTab === 'info'" class="info-tab">
-              <RecordInfo :record="record" />
+              <RecordInfo :record="record" class="record-info-content" />
             </div>
 
             <!-- Links Tab -->
@@ -75,6 +87,14 @@
             </div>
           </div>
         </div>
+      </div>
+    </div>
+
+    <!-- Image Preview Modal -->
+    <div v-if="showPreview" class="image-preview-modal" @click="closeImagePreview">
+      <div class="preview-container">
+        <button class="preview-close" @click="closeImagePreview">&times;</button>
+        <img :src="previewImageSrc" alt="Preview" class="preview-image" @click.stop />
       </div>
     </div>
   </div>
@@ -96,6 +116,10 @@ const record = computed(() => appState.selectedRecord);
 const coverImageSrc = ref<string>('');
 const sampleImageSrcs = ref<string[]>([]);
 const imageLoading = ref(false);
+
+// 图片预览状态
+const showPreview = ref(false);
+const previewImageSrc = ref<string>('');
 
 // 监听记录变化，加载对应的图片并标记为已查看
 watch(record, async (newRecord) => {
@@ -161,6 +185,21 @@ async function toggleLike() {
 function handleImageError(event: Event) {
   const img = event.target as HTMLImageElement;
   img.style.display = 'none';
+}
+
+// 图片预览功能
+function showImagePreview(imageSrc: string) {
+  previewImageSrc.value = imageSrc;
+  showPreview.value = true;
+  // 阻止页面滚动
+  document.body.style.overflow = 'hidden';
+}
+
+function closeImagePreview() {
+  showPreview.value = false;
+  previewImageSrc.value = '';
+  // 恢复页面滚动
+  document.body.style.overflow = '';
 }
 </script>
 
@@ -254,11 +293,11 @@ function handleImageError(event: Event) {
 }
 
 .record-images {
-  width: 50%; /* 调整为50% */
+  width: 45%;
   padding: 24px;
   overflow-y: auto;
   background-color: #f8f9fa;
-  flex-shrink: 0; /* 防止收缩 */
+  flex-shrink: 0;
 }
 
 .cover-section {
@@ -272,12 +311,18 @@ function handleImageError(event: Event) {
   border-radius: 12px;
   overflow: hidden;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+  cursor: pointer;
 }
 
 .cover-image {
   width: 100%;
   height: auto;
   display: block;
+  transition: transform 0.2s ease;
+}
+
+.cover-image:hover {
+  transform: scale(1.02);
 }
 
 .cover-placeholder {
@@ -318,6 +363,7 @@ function handleImageError(event: Event) {
   overflow: hidden;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
   transition: transform 0.2s ease;
+  cursor: pointer;
 }
 
 .sample-item:hover {
@@ -329,15 +375,16 @@ function handleImageError(event: Event) {
   height: 120px;
   object-fit: cover;
   display: block;
+  transition: transform 0.2s ease;
 }
 
 .record-info {
-  width: 50%; /* 调整为50% */
+  width: 55%;
   display: flex;
   flex-direction: column;
   background: white;
-  min-width: 0; /* 添加最小宽度约束 */
-  flex-shrink: 0; /* 防止收缩 */
+  min-width: 0;
+  flex-shrink: 0;
 }
 
 .tab-navigation {
@@ -374,13 +421,72 @@ function handleImageError(event: Event) {
   overflow-y: auto;
   padding: 24px;
   min-height: 0; /* 重要：允许flex子项缩小 */
+  width: 100%;
 }
 
 .info-tab {
   height: 100%; /* 确保info tab占据全部高度 */
+  width: 100%; /* 确保info tab占据全部宽度 */
 }
 
 .links-tab {
   height: 100%; /* 确保links tab占据全部高度 */
+  width: 100%; /* 确保links tab占据全部宽度 */
+}
+
+/* Image Preview Modal */
+.image-preview-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background-color: rgba(0, 0, 0, 0.9);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  cursor: pointer;
+}
+
+.preview-container {
+  position: relative;
+  max-width: 90vw;
+  max-height: 90vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.preview-close {
+  position: absolute;
+  top: -40px;
+  right: 0;
+  background: none;
+  border: none;
+  color: white;
+  font-size: 2rem;
+  cursor: pointer;
+  z-index: 10000;
+  padding: 8px;
+  border-radius: 50%;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.2s ease;
+}
+
+.preview-close:hover {
+  background-color: rgba(255, 255, 255, 0.2);
+}
+
+.preview-image {
+  max-width: 90vw;
+  max-height: 90vh;
+  object-fit: contain;
+  border-radius: 8px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
 }
 </style>

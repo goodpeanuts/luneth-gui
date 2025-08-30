@@ -8,6 +8,7 @@ import type {
   CrawlCodeReportEvent,
   CrawlCodesFinishedEvent,
   BatchCrawlStartEvent,
+  AutoCrawlCompleteEvent,
   IdolCrawlStartEvent,
   IdolCrawlProgressEvent,
   IdolCrawlCompleteEvent,
@@ -19,7 +20,8 @@ import type {
   SubmitStartEvent,
   SubmitCodeStartEvent,
   SubmitCodeResultEvent,
-  SubmitFinishedEvent
+  SubmitFinishedEvent,
+  UpdateFinishedEvent
 } from '@/types/events';
 
 import {
@@ -164,8 +166,30 @@ export async function initializeGlobalEventListeners() {
           targetProgress.status = 'mixed';
         }
       }
+
+      // Reset scrap task state when batch crawling completes (for manual batch mode only)
+      // Note: For auto mode, batch crawling is just part of the process, don't reset here
+      if (scrapTaskState.taskType === 'batch') {
+        scrapTaskState.isProcessing = false;
+        scrapTaskState.taskType = null;
+      }
     });
     unlistenFunctions.push(unlistenCodesFinished);
+
+    // Auto crawl complete - reset scrap task state (only for auto mode)
+    const unlistenAutoCrawlComplete = await listen<AutoCrawlCompleteEvent>('auto-crawl-complete', (event) => {
+      console.log('[Event] Auto crawl completed:', event.payload);
+
+      // Only reset if current task type is auto (safety check)
+      if (scrapTaskState.taskType === 'auto') {
+        scrapTaskState.isProcessing = false;
+        scrapTaskState.taskType = null;
+        console.log('[Event] Auto crawl task state reset');
+      } else {
+        console.warn('[Event] Received auto-crawl-complete but current task type is:', scrapTaskState.taskType);
+      }
+    });
+    unlistenFunctions.push(unlistenAutoCrawlComplete);
 
     // =================================
     // 管理任务相关事件监听
@@ -271,6 +295,21 @@ export async function initializeGlobalEventListeners() {
       );
     });
     unlistenFunctions.push(unlistenSubmitFinished);
+
+    // Update finished events - reset scrap task state for update tasks
+    const unlistenUpdateFinished = await listen<UpdateFinishedEvent>('update-finished', (event) => {
+      console.log('[Event] Update task finished:', event.payload);
+
+      // Update task status
+      updateTaskStatus('update', event.payload.errorCount > 0 ? 'failed' : 'success');
+      updateTaskMessage('update',
+        `Update completed: ${event.payload.successCount} successful, ${event.payload.errorCount} failed`
+      );
+
+      // Note: Update tasks don't use scrapTaskState, they use manageTaskState
+      // So no need to reset scrapTaskState here
+    });
+    unlistenFunctions.push(unlistenUpdateFinished);
 
     console.log('[EventManager] All event listeners initialized successfully');
 

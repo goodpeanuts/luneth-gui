@@ -31,6 +31,10 @@ export interface BatchCrawlStartEvent {
   totalCount: number;
 }
 
+export interface AutoCrawlCompleteEvent {
+  message: string;
+}
+
 // 管理任务事件接口
 export interface IdolCrawlStartEvent {
   message: string;
@@ -84,6 +88,19 @@ export interface SubmitCodeResultEvent {
 }
 
 export interface SubmitFinishedEvent {
+  successCount: number;
+  errorCount: number;
+  totalCount: number;
+}
+
+// Update task events
+export interface UpdateCodeReportEvent {
+  code: string;
+  status: 'Success' | 'Failed';
+  message: string;
+}
+
+export interface UpdateFinishedEvent {
   successCount: number;
   errorCount: number;
   totalCount: number;

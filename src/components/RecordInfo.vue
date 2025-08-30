@@ -1,5 +1,5 @@
 <template>
-  <div class="record-info">
+  <div class="record-info-content">
     <div class="info-sections">
       <!-- Basic Information -->
       <div class="info-section">
@@ -176,20 +176,25 @@ function formatDate(dateString: string): string {
 </script>
 
 <style scoped>
-.record-info {
+.record-info-content {
+  width: 100%;
   height: 100%;
   overflow-y: auto;
+  padding: 0;
+  margin: 0;
 }
 
 .info-sections {
   display: flex;
   flex-direction: column;
   gap: 24px;
+  width: 100%;
 }
 
 .info-section {
   border-bottom: 1px solid #f0f0f0;
   padding-bottom: 20px;
+  width: 100%;
 }
 
 .info-section:last-child {
@@ -204,6 +209,7 @@ function formatDate(dateString: string): string {
   margin-bottom: 16px;
   padding-bottom: 8px;
   border-bottom: 2px solid #007bff;
+  width: 100%;
 }
 
 .info-grid {

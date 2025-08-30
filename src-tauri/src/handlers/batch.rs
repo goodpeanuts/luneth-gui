@@ -105,7 +105,6 @@ pub async fn crawl_codes(
         }
 
         log::debug!("Crawling code: {code}");
-
         match crawler.crawl_recorder(input).await {
             Ok(record) => {
                 let mut image_path_dir = None;
@@ -135,6 +134,10 @@ pub async fn crawl_codes(
                         );
                     }
                     Err(e) => {
+                        if e.to_string().contains("UNIQUE constraint") {
+                            log::warn!("Record already exists: {code}, Please check existing records freshness");
+                            continue;
+                        }
                         // crawl_code_report
                         if let Some(image_path_dir) = image_path_dir {
                             fs::remove_dir_all(image_path_dir).map_err(AppError::from)?;
