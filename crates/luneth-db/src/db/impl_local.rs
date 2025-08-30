@@ -126,8 +126,7 @@ impl super::DbOperator {
         offset: Option<u64>,
         limit: Option<u64>,
         filters: Vec<LocalFilterCondition>,
-    ) -> Result<Vec<model>>
-where {
+    ) -> Result<Vec<model>> {
         let condition = to_conditions(filters);
 
         let mut query = entity::find().filter(condition);
@@ -145,15 +144,13 @@ where {
     }
 
     /// 更新记录
-    pub async fn update_record_local(&self, local_record: am) -> Result<model>
-where {
+    pub async fn update_record_local(&self, local_record: am) -> Result<model> {
         let result = local_record.update(&self.db).await?;
         Ok(result)
     }
 
     /// 删除记录
-    pub async fn delete_record_local(&self, local_record: am) -> Result<()>
-where {
+    pub async fn delete_record_local(&self, local_record: am) -> Result<()> {
         local_record.delete(&self.db).await?;
         Ok(())
     }
