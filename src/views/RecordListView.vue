@@ -110,15 +110,15 @@
         <div v-for="record in paginationState.records" :key="record.id" class="record-item"
           :class="{ unviewed: !record.viewed }" @click="openRecordDetail(record)">
           <div class="record-thumbnail">
-            <img
-              v-if="record.cover"
-              :src="record.cover"
-              :alt="record.title"
-              class="record-cover"
-              @error="handleImageError"
-            />
-            <div v-else class="record-cover-placeholder">📸</div>
-          </div>
+              <img
+                v-if="coverUrls[record.id]"
+                :src="coverUrls[record.id]"
+                :alt="record.title"
+                class="record-cover"
+                @error="handleImageError(record.id, $event)"
+              />
+              <div v-else class="record-cover-placeholder">📸</div>
+            </div>
 
           <div class="record-info">
             <div class="record-header">
@@ -177,7 +177,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue';
+import { ref, computed, onMounted, watch, onUnmounted } from 'vue';
 import type { RecordModel, RecordFilterOptions } from '@/types';
 import { navigateTo, appState, markRecordLiked, markRecordUnliked } from '@/store';
 import {
@@ -196,6 +196,9 @@ import {
 import Pagination from '@/components/Pagination.vue';
 
 const searchQuery = ref('');
+
+// Map of record.id -> image src (blob URL or remote URL)
+const coverUrls = ref<Record<string, string>>({});
 
 // 检查是否有激活的过滤器
 const hasActiveFilters = computed(() => {
@@ -226,6 +229,61 @@ onMounted(async () => {
   await fetchCurrentPageRecords();
 });
 
+// Load display image helper
+import { loadDisplayImage } from '@/utils/imageLoader';
+
+async function loadCoversForRecords(records: RecordModel[]) {
+  for (const record of records) {
+    const prev = coverUrls.value[record.id];
+
+    if (!record.cover) {
+      // ensure no cover URL stored
+      if (prev && prev.startsWith('blob:')) URL.revokeObjectURL(prev);
+      delete coverUrls.value[record.id];
+      continue;
+    }
+
+    try {
+      const url = await loadDisplayImage(record.id, record.cover);
+
+      // revoke previous blob URL if different
+      if (prev && prev !== url && prev.startsWith('blob:')) {
+        try { URL.revokeObjectURL(prev); } catch {}
+      }
+
+      coverUrls.value[record.id] = url;
+    } catch (err) {
+      console.warn('[RecordListView] failed to load cover for', record.id, err);
+      // fallback: ensure placeholder
+      if (prev && prev.startsWith('blob:')) {
+        try { URL.revokeObjectURL(prev); } catch {}
+      }
+      delete coverUrls.value[record.id];
+    }
+  }
+}
+
+// Watch records and load covers when they change
+watch(
+  () => paginationState.records,
+  (newRecords) => {
+    if (!newRecords) return;
+    // fire-and-forget
+    loadCoversForRecords(newRecords as RecordModel[]);
+  },
+  { immediate: true, deep: true }
+);
+
+onUnmounted(() => {
+  // Revoke any blob URLs to avoid memory leaks
+  for (const id in coverUrls.value) {
+    const url = coverUrls.value[id];
+    if (url && url.startsWith('blob:')) {
+      try { URL.revokeObjectURL(url); } catch {}
+    }
+  }
+});
+
 function openRecordDetail(record: RecordModel) {
   // Store the selected record in app state for detail view
   appState.selectedRecord = record;
@@ -253,9 +311,25 @@ async function toggleRecordLike(record: RecordModel) {
   }
 }
 
-function handleImageError(event: Event) {
-  const img = event.target as HTMLImageElement;
-  img.style.display = 'none';
+function handleImageError(recordIdOrEvent: string | Event, event?: Event) {
+  // two usage patterns supported for backward compatibility
+  if (typeof recordIdOrEvent === 'string') {
+    const recordId = recordIdOrEvent;
+    const ev = event as Event;
+    const img = ev?.target as HTMLImageElement | undefined;
+    const url = coverUrls.value[recordId];
+    if (url && url.startsWith('blob:')) {
+      try { URL.revokeObjectURL(url); } catch {}
+    }
+    delete coverUrls.value[recordId];
+    if (img) img.style.display = 'none';
+    return;
+  }
+
+  // old single-arg event handler
+  const ev = recordIdOrEvent as Event;
+  const img = ev.target as HTMLImageElement;
+  if (img) img.style.display = 'none';
 }
 
 // 筛选相关函数
