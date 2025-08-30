@@ -11,7 +11,7 @@ use crate::{
 use luneth_db::{DbOperator, DbService, OperationType};
 
 // XXX: conditionally stop
-const MAX_ITER_DEPTH: usize = 30;
+const MAX_ITER_DEPTH: usize = 120;
 
 impl super::Task {
     #[expect(clippy::too_many_arguments)]

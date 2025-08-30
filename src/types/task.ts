@@ -1,7 +1,7 @@
 // 任务相关类型定义
 
 // 爬取任务类型
-export type ScrapTaskType = 'auto' | 'manual';
+export type ScrapTaskType = 'auto' | 'batch';
 
 // 爬取任务状态
 export interface ScrapTaskState {

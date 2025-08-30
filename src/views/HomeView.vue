@@ -17,9 +17,9 @@
         </button>
         <button
           class="action-btn secondary"
-          @click="navigateTo('crawl')"
+          @click="navigateTo('task')"
         >
-          Start Crawling
+          Manage Tasks
         </button>
       </div>
 

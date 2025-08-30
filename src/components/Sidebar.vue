@@ -30,20 +30,20 @@
 
       <div
         class="nav-item"
-        :class="{ active: appState.currentView === 'crawl' }"
-        @click="navigateTo('crawl')"
+        :class="{ active: appState.currentView === 'task' }"
+        @click="navigateTo('task')"
       >
-        <div class="nav-icon">🕷️</div>
-        <span class="nav-text">Crawl</span>
+        <div class="nav-icon">�</div>
+        <span class="nav-text">Tasks</span>
       </div>
 
       <div
         class="nav-item"
-        :class="{ active: appState.currentView === 'manage' }"
-        @click="navigateTo('manage')"
+        :class="{ active: appState.currentView === 'extract' }"
+        @click="navigateTo('extract')"
       >
         <div class="nav-icon">🔧</div>
-        <span class="nav-text">Manage</span>
+        <span class="nav-text">Extract</span>
       </div>
 
       <div

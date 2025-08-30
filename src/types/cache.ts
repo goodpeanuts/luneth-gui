@@ -2,6 +2,13 @@
 
 import type { RecordModel, HistoryOpModel } from './record';
 
+// 图片缓存项
+export interface ImageCacheItem {
+  url: string;
+  isLocal: boolean;
+  timestamp: number;
+}
+
 // 缓存状态接口
 export interface CacheState {
   records: {
@@ -13,5 +20,8 @@ export interface CacheState {
     data: HistoryOpModel[];
     timestamp: number;
     isLoading: boolean;
+  };
+  images: {
+    [recordId: string]: ImageCacheItem;
   };
 }

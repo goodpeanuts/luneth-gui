@@ -25,8 +25,8 @@ use crate::command::{
     extract::{export_to_file, process_text, toggle_line_selection},
     image::{get_app_local_data_dir, read_local_record_image},
     interaction::{
-        get_all_op_history, get_all_records, mark_record_liked, mark_record_unliked,
-        mark_record_viewed,
+        get_all_exist_records, get_all_op_history, get_all_records, mark_record_liked,
+        mark_record_unliked, mark_record_viewed,
     },
     log::get_log_dir,
     task::{
@@ -186,7 +186,8 @@ pub fn run() {
             launch_record_pull_task,
             launch_submit_task,
             get_log_dir,
-            launch_update_task
+            launch_update_task,
+            get_all_exist_records
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

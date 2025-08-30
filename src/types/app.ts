@@ -1,6 +1,6 @@
 // 应用相关类型定义
 
-export type ViewType = 'home' | 'record_list' | 'history_list' | 'crawl' | 'manage' | 'config' | 'record_detail';
+export type ViewType = 'home' | 'record_list' | 'history_list' | 'task' | 'extract' | 'config' | 'record_detail';
 
 // 客户端认证状态
 export interface ClientAuthState {

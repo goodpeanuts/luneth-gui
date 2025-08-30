@@ -1,6 +1,7 @@
 // 全局事件管理器
 
 import { listen } from '@tauri-apps/api/event';
+import { invoke } from '@tauri-apps/api/core';
 import type {
   CrawlPageStartEvent,
   CrawlPageSuccessEvent,
@@ -22,11 +23,14 @@ import type {
   SubmitFinishedEvent
 } from '@/types/events';
 
+import type { RecordModel } from '@/types/record';
+import { loadDisplayImage } from '@/utils/imageLoader';
+import { setCachedRecords, setRecordsLoading } from './cache';
+
 import {
   progressState,
   findOrCreateProgress,
-  updateProgressStatus,
-  resetProgress
+  updateProgressStatus
 } from './progress';
 
 import {
@@ -41,6 +45,85 @@ import {
 
 // 事件监听器函数引用，用于清理
 let unlistenFunctions: (() => void)[] = [];
+
+// 定时刷新定时器
+let recordRefreshTimer: NodeJS.Timeout | null = null;
+const RECORD_AUTO_REFRESH_INTERVAL = 2 * 60 * 1000; // 2 minutes
+
+// 定时刷新记录列表
+function startRecordAutoRefresh() {
+  // 清除现有定时器
+  if (recordRefreshTimer) {
+    clearInterval(recordRefreshTimer);
+  }
+
+  // 启动新的定时器
+  recordRefreshTimer = setInterval(async () => {
+    try {
+      console.log('[EventManager] Auto refreshing record list...');
+      await preloadRecordList();
+    } catch (error) {
+      console.warn('[EventManager] Auto refresh failed:', error);
+    }
+  }, RECORD_AUTO_REFRESH_INTERVAL);
+
+  console.log('[EventManager] Record auto refresh started');
+}
+
+// 停止定时刷新
+function stopRecordAutoRefresh() {
+  if (recordRefreshTimer) {
+    clearInterval(recordRefreshTimer);
+    recordRefreshTimer = null;
+    console.log('[EventManager] Record auto refresh stopped');
+  }
+}
+
+// 手动刷新记录列表（重置定时器）
+export async function refreshRecordList(): Promise<void> {
+  await preloadRecordList();
+  // 重置定时器
+  startRecordAutoRefresh();
+}
+
+// 预加载记录列表
+async function preloadRecordList() {
+  try {
+    console.log('[EventManager] Loading record list...');
+    setRecordsLoading(true);
+
+    const records = await invoke<RecordModel[]>('get_all_records');
+    console.log(`[EventManager] Loaded ${records.length} records`);
+
+    // 缓存记录到全局状态
+    setCachedRecords(records);
+    setRecordsLoading(false);
+
+    // 对于有本地缓存的记录，预加载图片
+    const cachedRecords = records.filter(record => record.is_cached_locally && record.cover);
+    console.log(`[EventManager] Preloading images for ${cachedRecords.length} cached records`);
+
+    // 批量预加载图片，但不阻塞启动
+    Promise.all(
+      cachedRecords.map(async (record) => {
+        try {
+          await loadDisplayImage(record.id, record.cover!);
+        } catch (error) {
+          console.warn(`[EventManager] Failed to preload image for record ${record.id}:`, error);
+        }
+      })
+    ).then(() => {
+      console.log('[EventManager] Image preloading completed');
+    }).catch(error => {
+      console.warn('[EventManager] Some images failed to preload:', error);
+    });
+
+  } catch (error) {
+    console.error('[EventManager] Failed to preload record list:', error);
+    setRecordsLoading(false);
+    throw error;
+  }
+}
 
 // 初始化全局事件监听
 export async function initializeGlobalEventListeners() {
@@ -69,8 +152,7 @@ export async function initializeGlobalEventListeners() {
           latestPageProgress.status = 'in-progress';
         }
       } else {
-        // Manual模式：清空所有进度条并创建新的
-        resetProgress();
+        // Manual模式：创建新的进度条，但不清空其他进度条
         const progress = findOrCreateProgress('Manual Crawl');
         progress.total = event.payload.totalCount;
         progress.current = 0;
@@ -276,6 +358,16 @@ export async function initializeGlobalEventListeners() {
 
     console.log('[EventManager] All event listeners initialized successfully');
 
+    // 预加载记录列表（应用启动时）
+    try {
+      console.log('[EventManager] Preloading record list...');
+      await preloadRecordList();
+      // 启动定时刷新
+      startRecordAutoRefresh();
+    } catch (error) {
+      console.warn('[EventManager] Failed to preload record list:', error);
+    }
+
   } catch (error) {
     console.error('[EventManager] Failed to initialize event listeners:', error);
   }
@@ -284,6 +376,10 @@ export async function initializeGlobalEventListeners() {
 // 清理事件监听器
 export function cleanupEventListeners() {
   console.log('[EventManager] Cleaning up event listeners');
+
+  // 停止定时刷新
+  stopRecordAutoRefresh();
+
   unlistenFunctions.forEach(unlisten => {
     try {
       unlisten();

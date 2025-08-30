@@ -35,18 +35,18 @@
           </li>
           <li>
             <button
-              :class="{ active: appState.currentView === 'crawl' }"
-              @click="navigateTo('crawl')"
+              :class="{ active: appState.currentView === 'task' }"
+              @click="navigateTo('task')"
             >
-              🕷️ Crawl
+              � Tasks
             </button>
           </li>
           <li>
             <button
-              :class="{ active: appState.currentView === 'manage' }"
-              @click="navigateTo('manage')"
+              :class="{ active: appState.currentView === 'extract' }"
+              @click="navigateTo('extract')"
             >
-              🔧 Manage
+              🔧 Extract
             </button>
           </li>
           <li>
@@ -77,8 +77,8 @@ import HomeView from '@/views/HomeView.vue';
 import ConfigView from '@/views/ConfigView.vue';
 import RecordListView from '@/views/RecordListView.vue';
 import HistoryListView from '@/views/HistoryListView.vue';
-import CrawlView from '@/views/CrawlView.vue';
-import ManageView from '@/views/ManageView.vue';
+import TaskView from '@/views/TaskView.vue';
+import ExtractView from '@/views/ExtractView.vue';
 import RecordDetailView from '@/views/RecordDetailView.vue';
 
 // View component mapping
@@ -87,8 +87,8 @@ const viewComponents = {
   config: ConfigView,
   record_list: RecordListView,
   history_list: HistoryListView,
-  crawl: CrawlView,
-  manage: ManageView,
+  task: TaskView,
+  extract: ExtractView,
   record_detail: RecordDetailView,
 };
 

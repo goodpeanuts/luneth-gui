@@ -59,9 +59,6 @@
             <div class="history-left">
               <div class="operation-header">
                 <div class="operation-name">{{ item.operation || 'Unknown' }}</div>
-                <div class="operation-status" :class="{ 'success': item.status === 'SUCCESS', 'failed': item.status === 'FAILED' }">
-                  {{ item.status || 'Unknown' }}
-                </div>
               </div>
               <div class="history-info">
                 <div class="recorder-id">{{ item.recorder_id || 'N/A' }}</div>
@@ -69,7 +66,9 @@
               </div>
             </div>
 
-            <div class="history-right" v-if="item.error_message">
+            <div class="history-right"
+              :class="{ 'success': item.status === 'SUCCESS', 'failed': item.status === 'FAILED' }"
+              v-if="item.error_message">
               <div class="error-message">
                 {{ item.error_message }}
               </div>
@@ -94,7 +93,7 @@ const error = ref('');
 
 // 过滤状态
 const filterOperation = ref('');
-const filterStatus = ref('');
+const filterStatus = ref('FAILED'); // 默认过滤失败的记录
 
 onMounted(() => {
   // 首先显示缓存数据（如果有的话）
@@ -352,32 +351,21 @@ function formatDateTime(dateString: string): string {
 .history-list {
   height: 100%;
   overflow-y: auto;
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(400px, 600px));
+  display: flex;
+  flex-direction: column;
   gap: 16px;
   padding: 4px;
   max-width: 100%;
-  justify-content: center;
-}
-
-/* 响应式网格 - 基于容器宽度动态显示列数 */
-@media (max-width: 768px) {
-  .history-list {
-    grid-template-columns: 1fr;
-    justify-content: stretch;
-  }
 }
 
 .history-item {
   background: white;
   border: 1px solid #e9ecef;
   border-radius: 8px;
-  margin-bottom: 12px;
   transition: all 0.2s ease;
   padding: 16px;
   width: 100%;
   height: auto;
-  max-width: 600px;
 }
 
 .history-item:hover {
@@ -411,9 +399,8 @@ function formatDateTime(dateString: string): string {
 
 .operation-header {
   display: flex;
-  justify-content: space-between;
+  justify-content: flex-start;
   align-items: center;
-  gap: 12px;
   margin-bottom: 8px;
 }
 
@@ -423,27 +410,6 @@ function formatDateTime(dateString: string): string {
   color: #333;
   word-break: break-word;
   flex: 1;
-}
-
-.operation-status {
-  display: inline-block;
-  font-size: 0.9rem;
-  font-weight: 500;
-  padding: 4px 8px;
-  border-radius: 12px;
-  text-align: center;
-  white-space: nowrap;
-  flex-shrink: 0;
-}
-
-.operation-status.success {
-  background-color: #d4edda;
-  color: #155724;
-}
-
-.operation-status.failed {
-  background-color: #f8d7da;
-  color: #721c24;
 }
 
 .history-info {
@@ -471,6 +437,19 @@ function formatDateTime(dateString: string): string {
   flex: 1 1 auto; /* right column grows */
   min-width: 0;
   max-width: 67%;
+  padding: 8px;
+  border-radius: 6px;
+  border: 1px solid transparent;
+}
+
+.history-right.success {
+  background-color: #f8fff9;
+  border-color: #28a745;
+}
+
+.history-right.failed {
+  background-color: #fffafa;
+  border-color: #dc3545;
 }
 
 .error-message {
@@ -488,7 +467,7 @@ function formatDateTime(dateString: string): string {
 /* ensure badges don't color the whole card */
 .history-item.success {
   border-left: 4px solid #28a745;
-  background-color: #fff; /* keep card white, badge colors handled on .operation-status */
+  background-color: #fff;
 }
 
 .history-item.failed {
@@ -496,26 +475,10 @@ function formatDateTime(dateString: string): string {
   background-color: #fff;
 }
 
-.operation-status.success {
-  background-color: #d4edda;
-  color: #155724;
-}
-
-.operation-status.failed {
-  background-color: #f8d7da;
-  color: #721c24;
-}
-
 /* 响应式设计 */
 @media (max-width: 768px) {
-  .history-list {
-    grid-template-columns: 1fr !important;
-    justify-content: stretch !important;
-  }
-
   .history-item {
     width: 100%;
-    max-width: none;
   }
 
   .history-content {
@@ -526,16 +489,6 @@ function formatDateTime(dateString: string): string {
   .history-right {
     max-width: none;
     min-width: auto;
-  }
-
-  .operation-header {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 8px;
-  }
-
-  .operation-status {
-    align-self: flex-start;
   }
 
   .list-header {
@@ -554,13 +507,6 @@ function formatDateTime(dateString: string): string {
 
   .filter-select {
     min-width: auto;
-  }
-}
-
-/* 平板设备 */
-@media (min-width: 769px) and (max-width: 1024px) {
-  .history-list {
-    grid-template-columns: repeat(auto-fill, minmax(350px, 500px));
   }
 }
 </style>

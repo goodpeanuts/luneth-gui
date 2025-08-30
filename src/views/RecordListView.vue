@@ -11,51 +11,66 @@
     <!-- Filter Controls -->
     <div class="filter-section">
       <h3 class="filter-title">Filters</h3>
-      <div class="filter-controls">
-        <div class="filter-group">
-          <label class="filter-label">Liked Status:</label>
-          <select v-model="filters.isLiked" @change="applyFilters" class="filter-select">
-            <option :value="null">All</option>
-            <option :value="true">Liked Only</option>
-            <option :value="false">Not Liked</option>
-          </select>
-        </div>
 
-        <div class="filter-group">
-          <label class="filter-label">Viewed Status:</label>
-          <select v-model="filters.isViewed" @change="applyFilters" class="filter-select">
-            <option :value="null">All</option>
-            <option :value="true">Viewed Only</option>
-            <option :value="false">Not Viewed</option>
-          </select>
-        </div>
+      <!-- 搜索框 -->
+      <div class="search-section">
+        <input
+          v-model="searchQuery"
+          type="text"
+          placeholder="Search records..."
+          class="search-input"
+          @input="applyFilters"
+        />
+      </div>
 
-        <div class="filter-group">
-          <label class="filter-label">Submitted Status:</label>
-          <select v-model="filters.isSubmitted" @change="applyFilters" class="filter-select">
-            <option :value="null">All</option>
-            <option :value="true">Submitted Only</option>
-            <option :value="false">Not Submitted</option>
-          </select>
-        </div>
+      <!-- 过滤按钮 -->
+      <div class="filter-buttons">
+        <button
+          :class="['filter-btn', { active: filters.isLiked === true }]"
+          @click="toggleFilter('isLiked', true)"
+        >
+          <span class="filter-icon">❤️</span>
+          Liked
+        </button>
 
-        <div class="filter-group">
-          <label class="filter-label">Local Images:</label>
-          <select v-model="filters.hasLocalImages" @change="applyFilters" class="filter-select">
-            <option :value="null">All</option>
-            <option :value="true">Has Local Images</option>
-            <option :value="false">No Local Images</option>
-          </select>
-        </div>
+        <button
+          :class="['filter-btn', { active: filters.isViewed === true }]"
+          @click="toggleFilter('isViewed', true)"
+        >
+          <span class="filter-icon">👁️</span>
+          Viewed
+        </button>
 
-        <div class="filter-actions">
-          <button class="clear-filters-btn" @click="clearFilters">
-            Clear Filters
-          </button>
-          <div class="filter-results">
-            {{ filteredRecords.length }} of {{ allRecords.length }} records
-          </div>
-        </div>
+        <button
+          :class="['filter-btn', { active: filters.hasLocalImages === true }]"
+          @click="toggleFilter('hasLocalImages', true)"
+        >
+          <span class="filter-icon">📁</span>
+          Local
+        </button>
+
+        <button
+          :class="['filter-btn', { active: filters.isSubmitted === true }]"
+          @click="toggleFilter('isSubmitted', true)"
+        >
+          <span class="filter-icon">☁️</span>
+          Submit
+        </button>
+
+        <button
+          class="clear-filters-btn"
+          @click="clearFilters"
+          :disabled="!hasActiveFilters"
+        >
+          Clear All
+        </button>
+      </div>
+
+      <div class="filter-results">
+        {{ filteredRecords.length }} of {{ allRecords.length }} records
+        <span v-if="searchQuery" class="search-indicator">
+          (searching: "{{ searchQuery }}")
+        </span>
       </div>
     </div>
 
@@ -74,8 +89,8 @@
       <div class="empty-icon">📝</div>
       <p class="empty-text">No records found</p>
       <p class="empty-hint">Start crawling to create records</p>
-      <button class="crawl-btn" @click="navigateTo('crawl')">
-        Go to Crawl
+      <button class="crawl-btn" @click="navigateTo('task')">
+        Go to Tasks
       </button>
     </div>
 
@@ -163,15 +178,18 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue';
-import { invoke } from '@tauri-apps/api/core';
 import type { RecordModel, RecordFilterOptions } from '@/types';
-import { navigateTo, appState, getCachedRecords, setCachedRecords, setRecordsLoading, markRecordLiked, markRecordUnliked } from '@/store';
+import { navigateTo, appState, getCachedRecords, setRecordsLoading, markRecordLiked, markRecordUnliked, refreshRecordList } from '@/store';
+import { getCachedImage } from '@/store/cache';
 import { loadDisplayImage } from '@/utils/imageLoader';
 
 const allRecords = ref<RecordModel[]>([]);
 const isLoading = ref(false);
 const hasCached = ref(false);
 const error = ref('');
+
+// 搜索查询
+const searchQuery = ref('');
 
 // 筛选选项
 const filters = ref<RecordFilterOptions>({
@@ -181,12 +199,35 @@ const filters = ref<RecordFilterOptions>({
   hasLocalImages: null,
 });
 
-// 存储图片加载结果的映射
-const imageSources = ref<Map<string, string>>(new Map());
+// 移除本地imageSources，全部使用全局缓存
+
+// 检查是否有激活的过滤器
+const hasActiveFilters = computed(() => {
+  return (
+    filters.value.isLiked !== null ||
+    filters.value.isViewed !== null ||
+    filters.value.isSubmitted !== null ||
+    filters.value.hasLocalImages !== null ||
+    searchQuery.value.trim() !== ''
+  );
+});
 
 // 计算筛选后的记录
 const filteredRecords = computed(() => {
   return allRecords.value.filter(record => {
+    // 搜索过滤
+    if (searchQuery.value.trim()) {
+      const query = searchQuery.value.trim().toLowerCase();
+      const matchesSearch =
+        record.title.toLowerCase().includes(query) ||
+        record.id.toLowerCase().includes(query) ||
+        record.release_date.toLowerCase().includes(query);
+
+      if (!matchesSearch) {
+        return false;
+      }
+    }
+
     // Filter by liked status
     if (filters.value.isLiked !== null) {
       if (record.is_liked !== filters.value.isLiked) {
@@ -221,15 +262,15 @@ const filteredRecords = computed(() => {
 });
 
 onMounted(() => {
-  // 首先显示缓存数据（如果有的话）
+  // 直接显示缓存数据
   const cachedRecords = getCachedRecords();
   if (cachedRecords.length > 0) {
     hasCached.value = true;
     allRecords.value = cachedRecords;
+    // 对于缓存的记录，立即尝试显示已缓存的图片
+    loadRecordImages(cachedRecords);
   }
-
-  // 然后加载新数据
-  loadRecords();
+  // 不在这里自动加载记录，使用全局缓存的数据
 });
 
 async function loadRecords() {
@@ -238,12 +279,12 @@ async function loadRecords() {
   error.value = '';
 
   try {
-    const result = await invoke<RecordModel[]>('get_all_records');
-    // 按创建时间从新到旧排序
-    const sortedRecords = result.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+    // 使用全局刷新函数
+    await refreshRecordList();
+
+    // 获取刷新后的缓存数据
+    const sortedRecords = getCachedRecords();
     allRecords.value = sortedRecords;
-    // 更新缓存
-    setCachedRecords(sortedRecords);
 
     // 加载图片
     await loadRecordImages(sortedRecords);
@@ -256,25 +297,24 @@ async function loadRecords() {
 }
 
 async function loadRecordImages(recordList: RecordModel[]) {
+  // 对于有本地缓存的记录，尝试加载本地图片
   for (const record of recordList) {
     if (record.is_cached_locally && record.cover) {
       try {
-        const imageResult = await loadDisplayImage(record.id, record.cover);
-        imageSources.value.set(record.id, imageResult.src);
+        // loadDisplayImage内部会处理缓存
+        await loadDisplayImage(record.id, record.cover);
       } catch (error) {
         console.warn(`Failed to load image for record ${record.id}:`, error);
-        // 如果加载失败，使用原始封面 URL
-        imageSources.value.set(record.id, record.cover);
       }
-    } else if (record.cover) {
-      // 如果没有本地缓存，直接使用远程 URL
-      imageSources.value.set(record.id, record.cover);
     }
   }
 }
 
 function getImageSrc(record: RecordModel): string {
-  return imageSources.value.get(record.id) || record.cover || '';
+  // 从全局缓存获取图片URL
+  const cacheKey = `${record.id}_null`; // 封面图片的缓存key
+  const cachedUrl = getCachedImage(cacheKey);
+  return cachedUrl || record.cover || '';
 }
 
 function openRecordDetail(record: RecordModel) {
@@ -313,9 +353,17 @@ function handleImageError(event: Event) {
 }
 
 // 筛选相关函数
+function toggleFilter(filterKey: keyof RecordFilterOptions, value: boolean) {
+  const currentValue = filters.value[filterKey];
+  // 如果当前值等于要设置的值，则切换为null（取消过滤）
+  // 否则设置为指定值
+  filters.value[filterKey] = currentValue === value ? null : value;
+  applyFilters();
+}
+
 function applyFilters() {
   // filteredRecords 是计算属性，会自动响应 filters 的变化
-  console.log('Filters applied:', filters.value);
+  console.log('Filters applied:', filters.value, 'Search:', searchQuery.value);
 }
 
 function clearFilters() {
@@ -325,6 +373,7 @@ function clearFilters() {
     isSubmitted: null,
     hasLocalImages: null,
   };
+  searchQuery.value = '';
 }
 </script>
 
@@ -389,70 +438,94 @@ function clearFilters() {
   margin: 0 0 16px 0;
 }
 
-.filter-controls {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 16px;
-  align-items: center;
+/* 搜索框样式 */
+.search-section {
+  margin-bottom: 16px;
 }
 
-.filter-group {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  min-width: 150px;
-}
-
-.filter-label {
+.search-input {
+  width: 100%;
+  max-width: 400px;
+  padding: 8px 12px;
+  border: 2px solid #e9ecef;
+  border-radius: 6px;
   font-size: 0.9rem;
-  font-weight: 500;
-  color: #6c757d;
+  transition: border-color 0.2s ease;
 }
 
-.filter-select {
-  padding: 6px 8px;
-  border: 1px solid #ced4da;
-  border-radius: 4px;
-  background: white;
-  font-size: 0.9rem;
-  color: #495057;
-  cursor: pointer;
-}
-
-.filter-select:focus {
+.search-input:focus {
   outline: none;
   border-color: #007bff;
-  box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
 }
 
-.filter-actions {
+/* 过滤按钮样式 */
+.filter-buttons {
   display: flex;
-  flex-direction: column;
+  flex-wrap: wrap;
   gap: 8px;
-  margin-left: auto;
+  margin-bottom: 12px;
+}
+
+.filter-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  background: white;
+  border: 2px solid #e9ecef;
+  border-radius: 20px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  color: #495057;
+}
+
+.filter-btn:hover {
+  border-color: #007bff;
+  background: #f8f9ff;
+}
+
+.filter-btn.active {
+  background: #007bff;
+  border-color: #007bff;
+  color: white;
+}
+
+.filter-icon {
+  font-size: 1rem;
 }
 
 .clear-filters-btn {
-  padding: 6px 12px;
-  background-color: #6c757d;
+  padding: 8px 16px;
+  background: #6c757d;
   color: white;
   border: none;
-  border-radius: 4px;
+  border-radius: 6px;
   cursor: pointer;
   font-size: 0.85rem;
   transition: background-color 0.2s ease;
 }
 
-.clear-filters-btn:hover {
-  background-color: #5a6268;
+.clear-filters-btn:hover:not(:disabled) {
+  background: #5a6268;
+}
+
+.clear-filters-btn:disabled {
+  background: #adb5bd;
+  cursor: not-allowed;
 }
 
 .filter-results {
-  font-size: 0.85rem;
+  font-size: 0.9rem;
   color: #6c757d;
-  text-align: center;
+  font-weight: 500;
 }
 
+.search-indicator {
+  color: #007bff;
+  font-style: italic;
+}
 .loading-state, .error-state, .empty-state {
   display: flex;
   flex-direction: column;

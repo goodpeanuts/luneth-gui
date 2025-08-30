@@ -4,6 +4,19 @@
     v-if="progressState.isVisible"
     :data-count="progressState.progressList.length > 5 ? 'many' : 'few'"
   >
+    <!-- 进度条头部控制区域 -->
+    <div class="progress-header-controls">
+      <h3 class="progress-title">Task Progress</h3>
+      <button
+        class="clear-progress-btn"
+        @click="handleClearProgress"
+        :disabled="!hasCompletedProgress"
+        title="Clear completed progress bars"
+      >
+        🗑️ Clear Completed
+      </button>
+    </div>
+
     <div v-for="progress in progressState.progressList" :key="progress.id" class="progress-item">
       <div class="progress-header">
         <div class="progress-info">
@@ -38,7 +51,7 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted } from 'vue';
+import { onMounted, computed } from 'vue';
 import {
   progressState,
   showProgress as showProgressGlobal,
@@ -52,6 +65,26 @@ onMounted(() => {
     showProgressGlobal();
   }
 });
+
+// 检查是否有已完成的进度条
+const hasCompletedProgress = computed(() => {
+  return progressState.progressList.some(p =>
+    p.status === 'success' || p.status === 'failed' || p.status === 'mixed'
+  );
+});
+
+// 清空已完成的进度条
+function handleClearProgress() {
+  // 只保留正在进行的任务
+  progressState.progressList = progressState.progressList.filter(p =>
+    p.status === 'pending' || p.status === 'in-progress'
+  );
+
+  // 如果没有任何进度条了，隐藏整个进度组件
+  if (progressState.progressList.length === 0) {
+    progressState.isVisible = false;
+  }
+}
 
 // Get status class for styling
 const getStatusClass = (status: ProgressStatus): string => {
@@ -157,6 +190,50 @@ defineExpose({
   overflow-y: auto; /* 支持垂直滚动 */
   overflow-x: hidden;
   position: relative;
+}
+
+/* 进度条头部控制区域 */
+.progress-header-controls {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.progress-title {
+  color: white;
+  font-size: 1.2rem;
+  font-weight: 600;
+  margin: 0;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.clear-progress-btn {
+  background: rgba(255, 255, 255, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  color: white;
+  padding: 8px 16px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-weight: 500;
+  transition: all 0.3s ease;
+  backdrop-filter: blur(10px);
+}
+
+.clear-progress-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.25);
+  border-color: rgba(255, 255, 255, 0.5);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.clear-progress-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
 }
 
 .progress-item {

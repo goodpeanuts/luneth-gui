@@ -15,5 +15,8 @@ export * from './cache';
 // 记录相关
 export * from './record';
 
+// Extract 相关
+export * from './extract';
+
 // 事件管理
 export * from './eventManager';
