@@ -1,27 +1,12 @@
 // 缓存相关类型定义
 
-import type { RecordModel, HistoryOpModel } from './record';
+import type { HistoryOpModel } from './record';
 
-// 图片缓存项
-export interface ImageCacheItem {
-  url: string;
-  isLocal: boolean;
-  timestamp: number;
-}
-
-// 缓存状态接口
+// 缓存状态接口 - 简化版，移除记录和图片缓存
 export interface CacheState {
-  records: {
-    data: RecordModel[];
-    timestamp: number;
-    isLoading: boolean;
-  };
   history: {
     data: HistoryOpModel[];
     timestamp: number;
     isLoading: boolean;
-  };
-  images: {
-    [recordId: string]: ImageCacheItem;
   };
 }

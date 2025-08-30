@@ -637,15 +637,23 @@ function getProcessingText(): string {
   }
 }
 
-// 加载所有记录
+// 加载记录统计信息（而不是所有记录）
 async function loadAllRecords() {
   try {
-    const records = await invoke<RecordLocal[]>('get_all_records');
-    allRecords.value = records;
+    // 使用分页API获取总数，而不是加载所有记录
+    const totalCount = await invoke<number>('query_record_count', { filters: [] });
+
+    // 为了保持现有逻辑兼容，创建一个模拟的记录数组
+    // 这只是为了计数，不包含实际数据
+    allRecords.value = Array(totalCount).fill(null).map((_, index) => ({
+      id: `mock-${index}`,
+      // 其他必要字段可以根据需要添加默认值
+    })) as RecordLocal[];
+
     updateFilteredRecordsCount();
     updateFilteredSubmitRecordsCount();
   } catch (error) {
-    console.error('Failed to load records:', error);
+    console.error('Failed to load record count:', error);
     allRecords.value = [];
     filteredRecordsCount.value = 0;
     filteredSubmitRecordsCount.value = 0;

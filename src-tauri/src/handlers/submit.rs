@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use luneth::common::UploadImageDto;
-use luneth_db::{DbOperator, DbService as _, OperationType};
+use luneth_db::{DbOperator, OperationType};
 use serde::Serialize;
 use tauri::{AppHandle, Emitter as _};
 
@@ -33,7 +33,6 @@ impl super::Task {
     pub(super) async fn submit_codes(&self, codes: &[String]) -> Result<(), AppError> {
         log::debug!("Executing submit crawl task for {} codes", codes.len());
 
-        use luneth_db::record_local::Entity as RecordEntity;
         let mut client = new_postman().await?;
 
         let mut error_count = 0;
@@ -49,11 +48,7 @@ impl super::Task {
             // Send individual code start event
             report_submit_code_start(&self.app_handle, code);
 
-            let Some(local_record) = self
-                .db
-                .find_record_local_by_id::<RecordEntity>(code)
-                .await?
-            else {
+            let Some(local_record) = self.db.as_ref().find_record_local_by_id(code).await? else {
                 let error_msg = format!("Failed to find record for code: {code}");
                 log::error!("{error_msg}");
                 log_failed_op(

@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use luneth_db::{DbOperator, DbService};
+use luneth_db::DbOperator;
 use serde::Serialize;
 use tauri::{AppHandle, Emitter as _};
 
@@ -23,7 +23,7 @@ impl super::Task {
     }
 }
 
-async fn pull_record_slim(app_handle: &AppHandle, db: &impl DbService) -> Result<(), AppError> {
+async fn pull_record_slim(app_handle: &AppHandle, db: &DbOperator) -> Result<(), AppError> {
     let mut client = new_postman().await.map_err(|e| {
         let error_msg = format!("Failed to create client: {e}");
         report_record_pull_failed(app_handle, error_msg.clone());
