@@ -1,6 +1,6 @@
 use std::{sync::Arc, time::Duration};
 
-use luneth::crawl::CrawlConfig;
+use luneth::crawl::{browser::BrowserConfig, CrawlConfig};
 use luneth_db::DbOperator;
 use tauri::AppHandle;
 
@@ -36,11 +36,17 @@ impl AutoCrawlConfig {
             with_image,
             crawl_config: CrawlConfig {
                 base_url,
-                page_load_timeout: load_timeout,
+                browser: BrowserConfig {
+                    port: if webdriver_port == 0 {
+                        None
+                    } else {
+                        Some(webdriver_port)
+                    },
+                    page_load_timeout: load_timeout,
+                    headless,
+                },
                 magnet_timeout: load_timeout,
-                headless,
                 request_delay: Duration::from_secs(request_delay),
-                webdriver_port,
             },
         })
     }
@@ -68,11 +74,17 @@ impl BatchCrawlConfig {
             with_image,
             crawl_config: CrawlConfig {
                 base_url,
-                page_load_timeout: load_timeout,
+                browser: BrowserConfig {
+                    port: if webdriver_port == 0 {
+                        None
+                    } else {
+                        Some(webdriver_port)
+                    },
+                    page_load_timeout: load_timeout,
+                    headless,
+                },
                 magnet_timeout: load_timeout,
-                headless,
                 request_delay: Duration::from_secs(request_delay),
-                webdriver_port,
             },
         })
     }
